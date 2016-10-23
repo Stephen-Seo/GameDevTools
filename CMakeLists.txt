@@ -3,6 +3,7 @@ project(GameDevTools)
 
 set(GameDevTools_SOURCES
     src/GDT/GameLoop.cpp
+    src/GDT/SceneNode.cpp
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -25,9 +26,11 @@ if(GTEST_FOUND)
     set(UnitTests_SOURCES
         src/test/Main.cpp
         src/test/TestGameLoop.cpp
+        src/test/TestSceneNode.cpp
     )
 
     add_executable(UnitTests ${UnitTests_SOURCES})
     target_link_libraries(UnitTests GameDevTools ${GTEST_BOTH_LIBRARIES})
 
 endif()
+

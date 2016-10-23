@@ -62,6 +62,18 @@ const glm::mat4& SceneNode::getTransform() const
     return transform;
 }
 
+glm::mat4 SceneNode::getWorldTransform() const
+{
+    if(parent != nullptr)
+    {
+        return transform * parent->getWorldTransform();
+    }
+    else
+    {
+        return transform;
+    }
+}
+
 void SceneNode::applyTransform(const glm::mat4& transform)
 {
     this->transform = transform * this->transform;
@@ -173,18 +185,6 @@ void SceneNode::detachChildren()
 
         children.erase(found);
         detachRequests.pop_back();
-    }
-}
-
-glm::mat4 SceneNode::getWorldTransform() const
-{
-    if(parent != nullptr)
-    {
-        return transform * parent->getWorldTransform();
-    }
-    else
-    {
-        return transform;
     }
 }
 

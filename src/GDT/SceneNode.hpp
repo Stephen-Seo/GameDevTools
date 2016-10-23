@@ -28,31 +28,41 @@ public:
     SceneNode& operator=(const SceneNode& other) = delete;
 
     /*!
-        \brief Appends a SceneNode::Ptr to the end of this node's children
-        list.
+        \brief Queues an append of a SceneNode::Ptr to the end of this node's
+        children list.
+
+        update() will actually perform the append.
     */
     void attachChild(Ptr child);
     /*!
-        \brief Inserts a SceneNode::Ptr to the front of this node's children
-        list.
+        \brief Queues an insertion of a SceneNode::Ptr to the front of this
+        node's children list.
+
+        update() will actually perform the insertion.
     */
     void attachChildFront(Ptr child);
     /*!
-        \brief Appends a SceneNode::Ptr to the end of this tree's root's
-        children list.
+        \brief Queues an append of a SceneNode::Ptr to the end of this tree's
+        root's children list.
+
+        update() will actually perform the append.
     */
     void attachToRoot(Ptr child);
     /*!
-        \brief Inserts a SceneNode::Ptr to the front of this tree's root's
-        children list.
+        \brief Queues an insertion of a SceneNode::Ptr to the front of this
+        tree's root's children list.
+
+        update() will actually perform the insertion.
     */
     void attachToRootFront(Ptr child);
     /*!
-        \brief Detaches a node from this node's children list.
+        \brief Queues a detach of a node from this node's children list.
+
+        update() will actually perform the detach.
     */
     void detachChild(SceneNode* node);
     /*!
-        \brief Clears all child nodes from this node.
+        \brief Immediately clears all child nodes from this node.
     */
     void clear();
 
@@ -83,7 +93,7 @@ public:
 
         This base class does nothing on update (other than attach/detach
         nodes).
-        Thus updateCurrent must be overridden to perform an update using the
+        Thus updateCurrent() must be overridden to perform an update using the
         given deltaTime.
 
         All queued attaches/detaches will occur after this update.
@@ -128,7 +138,7 @@ public:
         The transform given to any node is the worldTransform of that node.
 
         This base class normally does nothing on draw.
-        Thus drawCurrent must be overridden to actually draw the current node
+        Thus drawCurrent() must be overridden to actually draw the current node
         using the given worldTransform.
     */
     void draw() const;

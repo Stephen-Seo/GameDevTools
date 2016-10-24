@@ -1,6 +1,6 @@
 
-#ifndef GAME_LOOP_HPP
-#define GAME_LOOP_HPP
+#ifndef GDT_GAME_LOOP_HPP
+#define GDT_GAME_LOOP_HPP
 
 #include <functional>
 

@@ -1,6 +1,6 @@
 
-#ifndef SCENE_NODE_HPP
-#define SCENE_NODE_HPP
+#ifndef GDT_SCENE_NODE_HPP
+#define GDT_SCENE_NODE_HPP
 
 #include <memory>
 #include <algorithm>

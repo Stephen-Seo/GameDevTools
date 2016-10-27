@@ -2,7 +2,9 @@
 project(GameDevTools)
 
 set(GameDevTools_SOURCES
+    src/GDT/internal/NetworkIdentifiers.cpp
     src/GDT/GameLoop.cpp
+    src/GDT/NetworkConnection.cpp
     src/GDT/SceneNode.cpp
 )
 
@@ -32,5 +34,14 @@ if(GTEST_FOUND)
     add_executable(UnitTests ${UnitTests_SOURCES})
     target_link_libraries(UnitTests GameDevTools ${GTEST_BOTH_LIBRARIES})
 
+endif()
+
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    set(NetworkingTest_SOURCES
+        src/networkingTest/Main.cpp
+    )
+
+    add_executable(NetworkingTest ${NetworkingTest_SOURCES})
+    target_link_libraries(NetworkingTest GameDevTools)
 endif()
 

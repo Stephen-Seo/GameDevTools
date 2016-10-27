@@ -1,23 +1,28 @@
 
 #include "NetworkIdentifiers.hpp"
 
-GDT::Network::PacketInfo::PacketInfo() :
+std::atomic_uint_fast32_t GDT::Internal::Network::connectionInstanceCount{};
+
+GDT::Internal::Network::PacketInfo::PacketInfo() :
 address(0),
 id(0),
 isResending(false)
 {}
 
-GDT::Network::PacketInfo::PacketInfo(std::chrono::steady_clock::time_point sentTime,
+GDT::Internal::Network::PacketInfo::PacketInfo(
+    const std::vector<char>& data,
+    std::chrono::steady_clock::time_point sentTime,
     uint32_t address,
     uint32_t id,
     bool isResending) :
+data(data),
 sentTime(sentTime),
 address(address),
 id(id),
 isResending(isResending)
 {}
 
-GDT::Network::ConnectionData::ConnectionData() :
+GDT::Internal::Network::ConnectionData::ConnectionData() :
 elapsedTime(std::chrono::steady_clock::now()),
 rSequence(0),
 ackBitfield(0xFFFFFFFF),
@@ -30,7 +35,7 @@ toggleTimer(0.0f),
 toggledTimer(0.0f)
 {}
 
-GDT::Network::ConnectionData::ConnectionData(uint32_t id, uint32_t lSequence, uint16_t port) :
+GDT::Internal::Network::ConnectionData::ConnectionData(uint32_t id, uint32_t lSequence, uint16_t port) :
 elapsedTime(std::chrono::steady_clock::now()),
 id(id),
 lSequence(lSequence),
@@ -46,23 +51,23 @@ toggledTimer(0.0f),
 port(port)
 {}
 
-bool GDT::Network::ConnectionData::operator== (const GDT::Network::ConnectionData& other) const
+bool GDT::Internal::Network::ConnectionData::operator== (const GDT::Internal::Network::ConnectionData& other) const
 {
     return id == other.id;
 }
 
-bool GDT::Network::MoreRecent(uint32_t current, uint32_t previous)
+bool GDT::Internal::Network::MoreRecent(uint32_t current, uint32_t previous)
 {
     return (((current > previous) && (current - previous <= 0x7FFFFFFF)) ||
             ((previous > current) && (previous - current > 0x7FFFFFFF)));
 }
 
-bool GDT::Network::IsSpecialID(uint32_t ID)
+bool GDT::Internal::Network::IsSpecialID(uint32_t ID)
 {
     return ID == CONNECT || ID == PING;
 }
 
-bool GDT::Network::InitializeSockets()
+bool GDT::Internal::Network::InitializeSockets()
 {
 #if PLATFORM == PLATFORM_WINDOWS
     WSADATA WsaData;
@@ -72,14 +77,23 @@ bool GDT::Network::InitializeSockets()
 #endif
 }
 
-void GDT::Network::CleanupSockets()
+void GDT::Internal::Network::CleanupSockets()
 {
 #if PLATFORM == PLATFORM_WINDOWS
     WSACleanup();
 #endif
 }
 
-std::size_t std::hash<GDT::Network::ConnectionData>::operator() (const GDT::Network::ConnectionData& connectionData) const
+std::string GDT::Internal::Network::addressToString(const uint32_t& address)
+{
+    return
+        std::to_string(address >> 24) + std::string(".") +
+        std::to_string((address >> 16) & 0xFF) + std::string(".") +
+        std::to_string((address >> 8) & 0xFF) + std::string(".") +
+        std::to_string(address & 0xFF);
+}
+
+std::size_t std::hash<GDT::Internal::Network::ConnectionData>::operator() (const GDT::Internal::Network::ConnectionData& connectionData) const
 {
     return connectionData.id;
 }

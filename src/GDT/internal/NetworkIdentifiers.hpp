@@ -1,9 +1,9 @@
 
-#ifndef GDT_NETWORK_IDENTIFIERS_HPP
-#define GDT_NETWORK_IDENTIFIERS_HPP
+#ifndef GDT_INTERNAL_NETWORK_IDENTIFIERS_HPP
+#define GDT_INTERNAL_NETWORK_IDENTIFIERS_HPP
 
-#ifdef GDT_CUSTOM_NETWORK_PROTOCOL_ID
- #define GAME_PROTOCOL_ID GDT_CUSTOM_NETWORK_PROTOCOL_ID
+#ifdef GDT_INTERNAL_NETWORK_CUSTOM_PROTOCOL_ID
+ #define GAME_PROTOCOL_ID GDT_INTERNAL_NETWORK_CUSTOM_PROTOCOL_ID
 #else
  #define GAME_PROTOCOL_ID 1357924680
 #endif
@@ -13,6 +13,8 @@
 #define SENT_PACKET_LIST_MAX_SIZE 33
 #define CONNECTION_TIMEOUT_MILLISECONDS 10000
 #define CLIENT_RETRY_TIME_SECONDS 5.0f
+#define GDT_INTERNAL_NETWORK_GOOD_RTT_LIMIT_MILLISECONDS 250
+#define GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE 2048
 
 #define NETWORK_GOOD_MODE_SEND_INTERVAL 1.0f/30.0f
 #define NETWORK_BAD_MODE_SEND_INTERVAL 1.0f/10.0f
@@ -22,6 +24,8 @@
 #include <cstdlib>
 #include <cstdint>
 #include <chrono>
+#include <atomic>
+#include <string>
 
 #include "Platform.hpp"
 
@@ -36,13 +40,18 @@
 
 namespace GDT
 {
+namespace Internal
+{
 namespace Network
 {
+
+extern std::atomic_uint_fast32_t connectionInstanceCount;
 
 struct PacketInfo
 {
     PacketInfo();
-    PacketInfo(std::chrono::steady_clock::time_point sentTime =
+    PacketInfo(const std::vector<char>& data = std::vector<char>(),
+        std::chrono::steady_clock::time_point sentTime =
             std::chrono::steady_clock::time_point(),
         uint32_t address = 0,
         uint32_t id = 0,
@@ -67,7 +76,7 @@ struct ConnectionData
     uint32_t ackBitfield;
     std::list<PacketInfo> sentPackets;
     std::list<PacketInfo> sendPacketQueue;
-    std::chrono::steady_clock::duration rtt;
+    std::chrono::milliseconds rtt;
     bool triggerSend;
     float timer;
     bool isGood;
@@ -92,15 +101,18 @@ bool IsSpecialID(uint32_t ID);
 bool InitializeSockets();
 void CleanupSockets();
 
+std::string addressToString(const uint32_t& address);
+
 } // namespace Network
+} // namespace Internal
 } // namespace GDT
 
 namespace std
 {
     template <>
-    struct hash<GDT::Network::ConnectionData>
+    struct hash<GDT::Internal::Network::ConnectionData>
     {
-        std::size_t operator() (const GDT::Network::ConnectionData& connectionData) const;
+        std::size_t operator() (const GDT::Internal::Network::ConnectionData& connectionData) const;
     };
 }
 

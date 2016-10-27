@@ -1,0 +1,1098 @@
+
+#include "NetworkConnection.hpp"
+
+#include <cstring>
+#include <unistd.h>
+
+GDT::Network::Connection::Connection(Mode mode, unsigned short serverPort, unsigned short clientPort, bool clientBroadcast) :
+acceptNewConnections(true),
+ignoreOutOfSequence(false),
+resendTimedOutPackets(true),
+mode(mode),
+clientSentAddressSet(false),
+initialized(false),
+validState(false),
+invalidNoticeTimer(INVALID_NOTICE_TIME),
+serverPort(serverPort),
+clientPort(clientPort),
+clientRetryTimer(CLIENT_RETRY_TIME_SECONDS),
+clientBroadcast(clientBroadcast)
+{
+    if(GDT::Internal::Network::connectionInstanceCount++ == 0)
+    {
+#ifndef NDEBUG
+        bool result = GDT::Internal::Network::InitializeSockets();
+        assert(result);
+#else
+        GDT::Internal::Network::InitializeSockets();
+#endif
+    }
+}
+
+GDT::Network::Connection::~Connection()
+{
+    if(validState)
+    {
+#if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
+        close(socketHandle);
+#else
+        closesocket(socketHandle);
+#endif
+    }
+
+    if(--GDT::Internal::Network::connectionInstanceCount == 0)
+    {
+        GDT::Internal::Network::CleanupSockets();
+    }
+}
+
+void GDT::Network::Connection::update(float deltaTime)
+{
+    if(!initialized)
+    {
+#ifndef NDEBUG
+        std::cout << "Lazy initializing connection..." << std::endl;
+#endif
+        initialize();
+        initialized = true;
+    }
+
+    if(!validState)
+    {
+        invalidNoticeTimer -= deltaTime;
+        if(invalidNoticeTimer <= 0)
+        {
+            std::clog << "Warning: Connection is in invalid state, not doing anything!" << std::endl;
+            invalidNoticeTimer = INVALID_NOTICE_TIME;
+        }
+        return;
+    }
+
+    for(auto iter = connectionData.begin(); iter != connectionData.end(); ++iter)
+    {
+        iter->second.toggleTimer += deltaTime;
+        iter->second.toggledTimer += deltaTime;
+
+        if(iter->second.isGood && !iter->second.isGoodRtt)
+        {
+            // good status, rtt is bad
+#ifndef NDEBUG
+            std::cout << "Switching to bad network mode for " << GDT::Internal::Network::addressToString(iter->first) << '\n';
+#endif
+            iter->second.isGood = false;
+            if(iter->second.toggledTimer <= 10.0f)
+            {
+                iter->second.toggleTime *= 2.0f;
+                if(iter->second.toggleTime > 60.0f)
+                {
+                    iter->second.toggleTime = 60.0f;
+                }
+            }
+            iter->second.toggledTimer = 0.0f;
+        }
+        else if(iter->second.isGood)
+        {
+            // good status, rtt is good
+            if(iter->second.toggleTimer >= 10.0f)
+            {
+                iter->second.toggleTimer = 0.0f;
+                iter->second.toggleTime /= 2.0f;
+                if(iter->second.toggleTime < 1.0f)
+                {
+                    iter->second.toggleTime = 1.0f;
+                }
+            }
+        }
+        else if(!iter->second.isGood && iter->second.isGoodRtt)
+        {
+            // bad status, rtt is good
+            if(iter->second.toggledTimer >= iter->second.toggleTime)
+            {
+                iter->second.toggleTimer = 0.0f;
+                iter->second.toggledTimer = 0.0f;
+#ifndef NDEBUG
+                std::cout << "Switching to good network mode for " << GDT::Internal::Network::addressToString(iter->first) << '\n';
+#endif
+                iter->second.isGood = true;
+            }
+        }
+        else
+        {
+            // bad status, rtt is bad
+            iter->second.toggledTimer = 0.0f;
+        }
+
+        iter->second.timer += deltaTime;
+        if(iter->second.timer >= (iter->second.isGood ? NETWORK_GOOD_MODE_SEND_INTERVAL : NETWORK_BAD_MODE_SEND_INTERVAL))
+        {
+            iter->second.timer = 0.0f;
+            iter->second.triggerSend = true;
+        }
+    }
+
+    if(mode == SERVER)
+    {
+        // check if clients have timed out
+        std::list<uint32_t> disconnectQueue;
+        for(auto iter = connectionData.begin(); iter != connectionData.end(); ++iter)
+        {
+            auto duration = std::chrono::steady_clock::now() - iter->second.elapsedTime;
+            if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() >= CONNECTION_TIMEOUT_MILLISECONDS)
+            {
+                disconnectQueue.push_front(iter->first);
+            }
+        }
+
+        for(auto iter = disconnectQueue.begin(); iter != disconnectQueue.end(); ++iter)
+        {
+#ifndef NDEBUG
+            std::cout << "Disconnected " << GDT::Internal::Network::addressToString(*iter) << std::endl;
+#endif
+            unregisterConnection(*iter);
+        }
+
+        // send packet as server to each client
+        for(auto iter = connectionData.begin(); iter != connectionData.end(); ++iter)
+        {
+            if(iter->second.triggerSend)
+            {
+                iter->second.triggerSend = false;
+                if(!iter->second.sendPacketQueue.empty())
+                {
+                    auto pInfo = iter->second.sendPacketQueue.back();
+                    iter->second.sendPacketQueue.pop_back();
+
+                    std::vector<char> data;
+                    uint32_t sequenceID;
+                    if(pInfo.isResending)
+                    {
+                        sequenceID = pInfo.id;
+                    }
+                    else
+                    {
+                        preparePacket(data, sequenceID, iter->first);
+                    }
+                    // append packetInfo's data to prepared data
+                    data.insert(data.end(), pInfo.data.begin(), pInfo.data.end());
+
+                    // send data
+                    sockaddr_in destinationInfo;
+                    destinationInfo.sin_family = AF_INET;
+                    destinationInfo.sin_addr.s_addr = htonl(iter->first);
+                    destinationInfo.sin_port = htons(iter->second.port);
+                    int sentBytes = sendto(socketHandle,
+                        (const char*) data.data(),
+                        data.size(),
+                        0,
+                        (sockaddr*) &destinationInfo,
+                        sizeof(sockaddr_in));
+
+                    if(sentBytes != data.size())
+                    {
+                        std::cerr << "Failed to send packet to client!" << std::endl;
+                    }
+                    else
+                    {
+                        // store current packet info in sentPackets
+                        iter->second.sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), iter->first, sequenceID));
+
+                        checkSentPacketsSize(iter->first);
+                    }
+                }
+                else
+                {
+                    // send a heartbeat(empty) packet because the queue is empty
+
+                    std::vector<char> data;
+                    uint32_t sequenceID;
+                    preparePacket(data, sequenceID, iter->first);
+
+                    sockaddr_in destinationInfo;
+                    destinationInfo.sin_family = AF_INET;
+                    destinationInfo.sin_addr.s_addr = htonl(iter->first);
+                    destinationInfo.sin_port = htons(iter->second.port);
+                    int sentBytes = sendto(socketHandle,
+                        (const char*) data.data(),
+                        data.size(),
+                        0,
+                        (sockaddr*) &destinationInfo,
+                        sizeof(sockaddr_in));
+
+                    if(sentBytes != data.size())
+                    {
+                        std::cerr << "Failed to send heartbeat packet to client!" << std::endl;
+                    }
+                    else
+                    {
+                        // store current packet info in sentPackets
+                        iter->second.sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), iter->first, sequenceID));
+
+                        checkSentPacketsSize(iter->first);
+                    }
+                }
+            }
+        }
+
+        // receive packet
+        std::vector<char> data(GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE);
+#if PLATFORM == PLATFORM_WINDOWS
+        typedef int socklen_t;
+#endif
+        sockaddr_in receivedData;
+        socklen_t receivedDataSize = sizeof(receivedData);
+
+        int bytes = recvfrom(socketHandle,
+            data.data(),
+            GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE,
+            0,
+            (sockaddr*) &receivedData,
+            &receivedDataSize);
+
+        if(bytes >= 20)
+        {
+            uint32_t address = ntohl(receivedData.sin_addr.s_addr);
+            uint16_t port = ntohs(receivedData.sin_port);
+
+            uint32_t* tempPtr = (uint32_t*)data.data();
+            uint32_t protocolID = ntohl(*tempPtr);
+
+            // check protocol ID
+            if(protocolID != GAME_PROTOCOL_ID)
+                return;
+
+            tempPtr = (uint32_t*)(data.data() + 4);
+            uint32_t ID = ntohl(*tempPtr);
+            tempPtr = (uint32_t*)(data.data() + 8);
+            uint32_t sequence = ntohl(*tempPtr);
+            tempPtr = (uint32_t*)(data.data() + 12);
+            uint32_t ack = ntohl(*tempPtr);
+            tempPtr = (uint32_t*)(data.data() + 16);
+            uint32_t ackBitfield = ntohl(*tempPtr);
+
+            if(ID == GDT::Internal::Network::CONNECT && acceptNewConnections)
+            {
+                if(connectionData.find(address) == connectionData.end())
+                {
+#ifndef NDEBUG
+                    std::cout << "SERVER: Establishing new connection with " << GDT::Internal::Network::addressToString(address) << '\n';
+#endif
+                    // Establish connection
+                    registerConnection(address, 0, port);
+                    connectionData.at(address).triggerSend = true;
+                }
+                return;
+            }
+            else if(ID == GDT::Internal::Network::PING)
+            {
+                connectionData.at(address).triggerSend = true;
+            }
+            else if(connectionData.find(address) == connectionData.end())
+            {
+                // Unknown client not attemping to connect, ignoring
+                return;
+            }
+            else if(ID != connectionData.at(address).id)
+            {
+                // ID and address doesn't match, ignoring
+                return;
+            }
+
+            // packet is valid
+#ifndef NDEBUG
+            std::cout << "Valid packet " << sequence << " received from " << GDT::Internal::Network::addressToString(address) << '\n';
+#endif
+
+            bool outOfOrder = false;
+
+            lookupRtt(address, ack);
+
+            connectionData.at(address).elapsedTime = std::chrono::steady_clock::now();
+            checkSentPackets(ack, ackBitfield, address);
+
+            uint32_t diff = 0;
+            if(sequence > connectionData.at(address).rSequence)
+            {
+                diff = sequence - connectionData.at(address).rSequence;
+                if(diff <= 0x7FFFFFFF)
+                {
+                    // sequence is more recent
+                    connectionData.at(address).rSequence = sequence;
+                    shiftBitfield(address, diff);
+                }
+                else
+                {
+                    // sequence is older packet id, diff requires recalc
+                    diff = sequence + (0xFFFFFFFF - connectionData.at(address).rSequence) + 1;
+
+                    if((connectionData.at(address).ackBitfield & (0x100000000 >> diff)) != 0x0)
+                    {
+                        // already received packet
+                        return;
+                    }
+                    connectionData.at(address).ackBitfield |= (0x100000000 >> diff);
+
+                    if(ignoreOutOfSequence)
+                        return;
+
+                    outOfOrder = true;
+                }
+            }
+            else if(connectionData.at(address).rSequence > sequence)
+            {
+                diff = connectionData.at(address).rSequence - sequence;
+                if(diff > 0x7FFFFFFF)
+                {
+                    // sequence is more recent, diff requires recalc
+                    diff = sequence + (0xFFFFFFFF - connectionData.at(address).rSequence) + 1;
+
+                    connectionData.at(address).rSequence = sequence;
+                    shiftBitfield(address, diff);
+                }
+                else
+                {
+                    // sequence is older packet id
+                    if((connectionData.at(address).ackBitfield & (0x100000000 >> diff)) != 0x0)
+                    {
+                        // already received packet
+                        return;
+                    }
+                    connectionData.at(address).ackBitfield |= (0x100000000 >> diff);
+
+                    if(ignoreOutOfSequence)
+                        return;
+
+                    outOfOrder = true;
+                }
+            }
+            else
+            {
+                // duplicate packet, ignoring
+                return;
+            }
+
+            receivedPacket(data.data() + 20, bytes - 20, address, outOfOrder);
+        }
+    } // if(mode == SERVER)
+    else if(mode == CLIENT)
+    {
+        uint32_t& serverAddress = clientSentAddress;
+        // connection established
+        if(connectionData.size() > 0)
+        {
+            // check if timed out
+            auto duration = std::chrono::steady_clock::now() - connectionData.at(serverAddress).elapsedTime;
+            if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() > CONNECTION_TIMEOUT_MILLISECONDS)
+            {
+#ifndef NDEBUG
+                std::cout << "Disconnected from server " << GDT::Internal::Network::addressToString(serverAddress) << '\n';
+#endif
+                unregisterConnection(serverAddress);
+                return;
+            }
+
+            // send packet as client to server
+            if(connectionData.at(serverAddress).triggerSend)
+            {
+                connectionData.at(serverAddress).triggerSend = false;
+                if(!connectionData.at(serverAddress).sendPacketQueue.empty())
+                {
+                    PacketInfo pInfo = connectionData.at(serverAddress).sendPacketQueue.back();
+                    connectionData.at(serverAddress).sendPacketQueue.pop_back();
+
+
+                    std::vector<char> data;
+                    uint32_t sequenceID;
+                    if(pInfo.isResending)
+                    {
+                        sequenceID = pInfo.id;
+                    }
+                    else
+                    {
+                        preparePacket(data, sequenceID, serverAddress);
+                    }
+
+                    data.insert(data.end(), pInfo.data.begin(), pInfo.data.end());
+
+                    // send data
+                    sockaddr_in destinationInfo;
+                    destinationInfo.sin_family = AF_INET;
+                    destinationInfo.sin_addr.s_addr = htonl(serverAddress);
+                    destinationInfo.sin_port = htons(serverPort);
+                    int sentBytes = sendto(socketHandle,
+                        (const char*) data.data(),
+                        data.size(),
+                        0,
+                        (sockaddr*) &destinationInfo,
+                        sizeof(sockaddr_in));
+
+                    if(sentBytes != data.size())
+                    {
+                        std::cerr << "Failed to send packet to server!" << std::endl;
+                    }
+                    else
+                    {
+                        connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), serverAddress, sequenceID));
+                        checkSentPacketsSize(serverAddress);
+                    }
+                }
+                else
+                {
+                    // send a heartbeat(empty) packet because the queue is empty
+
+                    std::vector<char> data;
+                    uint32_t sequenceID;
+                    preparePacket(data, sequenceID, serverAddress);
+
+                    // send data
+                    sockaddr_in destinationInfo;
+                    destinationInfo.sin_family = AF_INET;
+                    destinationInfo.sin_addr.s_addr = htonl(serverAddress);
+                    destinationInfo.sin_port = htons(serverPort);
+                    int sentBytes = sendto(socketHandle,
+                        (const char*) data.data(),
+                        data.size(),
+                        0,
+                        (sockaddr*) &destinationInfo,
+                        sizeof(sockaddr_in));
+
+                    if(sentBytes != data.size())
+                    {
+                        std::cerr << "Failed to send heartbeat packet to server!" << std::endl;
+                    }
+                    else
+                    {
+                        connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), serverAddress, sequenceID));
+                        checkSentPacketsSize(serverAddress);
+                    }
+                }
+            }
+
+            // receive
+            std::vector<char> data(GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE);
+#if PLATFORM == PLATFORM_WINDOWS
+            typedef int socklen_t;
+#endif
+            sockaddr_in receivedData;
+            socklen_t receivedDataSize = sizeof(receivedData);
+
+            int bytes = recvfrom(socketHandle,
+                data.data(),
+                GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE,
+                0,
+                (sockaddr*) &receivedData,
+                &receivedDataSize);
+
+            uint32_t address = ntohl(receivedData.sin_addr.s_addr);
+            uint16_t port = ntohs(receivedData.sin_port);
+
+            if(bytes >= 20 && address == serverAddress && port == serverPort)
+            {
+                uint32_t* tempPtr = (uint32_t*)data.data();
+                uint32_t protocolID = ntohl(*tempPtr);
+
+                if(protocolID != GAME_PROTOCOL_ID)
+                    return;
+
+                tempPtr = (uint32_t*)(data.data() + 4);
+                uint32_t ID = ntohl(*tempPtr);
+                tempPtr = (uint32_t*)(data.data() + 8);
+                uint32_t sequence = ntohl(*tempPtr);
+                tempPtr = (uint32_t*)(data.data() + 12);
+                uint32_t ack = ntohl(*tempPtr);
+                tempPtr = (uint32_t*)(data.data() + 16);
+                uint32_t bitfield = ntohl(*tempPtr);
+
+                if(ID == GDT::Internal::Network::PING)
+                {
+                    connectionData.at(serverAddress).triggerSend = true;
+                }
+                else if(ID != connectionData.at(serverAddress).id)
+                    return;
+
+                // packet is valid
+#ifndef NDEBUG
+                std::cout << "Valid packet " << sequence << " received from " << GDT::Internal::Network::addressToString(serverAddress) << '\n';
+#endif
+
+                bool outOfOrder = false;
+
+                lookupRtt(serverAddress, ack);
+
+                connectionData.at(serverAddress).elapsedTime = std::chrono::steady_clock::now();
+                checkSentPackets(ack, bitfield, serverAddress);
+
+                uint32_t diff = 0;
+                if(sequence > connectionData.at(serverAddress).rSequence)
+                {
+                    diff = sequence - connectionData.at(serverAddress).rSequence;
+                    if(diff <= 0x7FFFFFFF)
+                    {
+                        // sequence is more recent
+                        connectionData.at(serverAddress).rSequence = sequence;
+                        shiftBitfield(address, diff);
+                    }
+                    else
+                    {
+                        // sequence is older packet id, diff requires recalc
+                        diff = sequence + (0xFFFFFFFF - connectionData.at(serverAddress).rSequence) + 1;
+
+                        if((connectionData.at(serverAddress).ackBitfield & (0x100000000 >> diff)) != 0x0)
+                        {
+                            // already received packet
+                            return;
+                        }
+                        connectionData.at(serverAddress).ackBitfield |= (0x100000000 >> diff);
+
+                        if(ignoreOutOfSequence)
+                            return;
+
+                        outOfOrder = true;
+                    }
+                }
+                else if(connectionData.at(serverAddress).rSequence > sequence)
+                {
+                    diff = connectionData.at(serverAddress).rSequence - sequence;
+                    if(diff > 0x7FFFFFFF)
+                    {
+                        // sequence is more recent, diff requires recalc
+                        diff = sequence + (0xFFFFFFFF - connectionData.at(serverAddress).rSequence) + 1;
+
+                        connectionData.at(serverAddress).rSequence = sequence;
+                        shiftBitfield(address, diff);
+                    }
+                    else
+                    {
+                        // sequence is older packet id
+                        if((connectionData.at(serverAddress).ackBitfield & (0x100000000 >> diff)) != 0x0)
+                        {
+                            // already received packet
+                            return;
+                        }
+                        connectionData.at(serverAddress).ackBitfield |= (0x100000000 >> diff);
+
+                        if(ignoreOutOfSequence)
+                            return;
+
+                        outOfOrder = true;
+                    }
+                }
+                else
+                {
+                    // duplicate packet, ignoring
+                    return;
+                }
+
+                receivedPacket(data.data() + 20, bytes - 20, serverAddress, outOfOrder);
+            }
+        }
+        // connection not yet established
+        else if(acceptNewConnections)
+        {
+            // check retry timer
+            clientRetryTimer += deltaTime;
+            if(clientRetryTimer >= CLIENT_RETRY_TIME_SECONDS && (clientSentAddressSet || clientBroadcast))
+            {
+#ifndef NDEBUG
+                std::cout << "CLIENT: Establishing connection with server..." << std::endl;
+#endif
+                clientRetryTimer = 0.0f;
+//                sf::Packet packet;
+//                packet << (sf::Uint32) GAME_PROTOCOL_ID << (sf::Uint32) network::CONNECT << (sf::Uint32) 0 << (sf::Uint32) 0 << (sf::Uint32) 0xFFFFFFFF;
+                char data[20];
+                uint32_t temp = htonl(GAME_PROTOCOL_ID);
+                memcpy(data, &temp, 4);
+                temp = htonl(GDT::Internal::Network::CONNECT);
+                memcpy(data + 4, &temp, 4);
+                temp = 0;
+                memcpy(data + 8, &temp, 4);
+                memcpy(data + 12, &temp, 4);
+                temp = 0xFFFFFFFF;
+                memcpy(data + 16, &temp, 4);
+
+                // send data
+                sockaddr_in destinationInfo;
+                destinationInfo.sin_family = AF_INET;
+                destinationInfo.sin_port = htons(serverPort);
+                if(clientBroadcast)
+                {
+                    destinationInfo.sin_addr.s_addr = 0xFFFFFFFF;
+                }
+                else
+                {
+                    destinationInfo.sin_addr.s_addr = htonl(serverAddress);
+                }
+                int sentBytes = sendto(socketHandle,
+                    (const char*) data,
+                    20,
+                    0,
+                    (sockaddr*) &destinationInfo,
+                    sizeof(sockaddr_in));
+                if(sentBytes != 20)
+                {
+                    std::cerr << "ERROR: Failed to send initiate connection packet to server!" << std::endl;
+                }
+            }
+
+            // receive
+            std::vector<char> data(GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE);
+#if PLATFORM == PLATFORM_WINDOWS
+            typedef int socklen_t;
+#endif
+            sockaddr_in receivedData;
+            socklen_t receivedDataSize = sizeof(receivedData);
+
+            int bytes = recvfrom(socketHandle,
+                data.data(),
+                GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE,
+                0,
+                (sockaddr*) &receivedData,
+                &receivedDataSize);
+
+            uint32_t address = ntohl(receivedData.sin_addr.s_addr);
+            uint16_t port = ntohs(receivedData.sin_port);
+
+            if(bytes >= 20 && port == serverPort)
+            {
+#ifndef NDEBUG
+                std::cout << "." << std::flush;
+#endif
+                uint32_t* tempPtr = (uint32_t*)data.data();
+                uint32_t protocolID = ntohl(*tempPtr);
+
+                if(protocolID != GAME_PROTOCOL_ID)
+                    return;
+
+                tempPtr = (uint32_t*)(data.data() + 4);
+                uint32_t ID = ntohl(*tempPtr);
+//                tempPtr = (uint32_t*)(data.data() + 8);
+//                uint32_t sequence = ntohl(*tempPtr);
+//                tempPtr = (uint32_t*)(data.data() + 12);
+//                uint32_t ack = ntohl(*tempPtr);
+//                tempPtr = (uint32_t*)(data.data() + 16);
+//                uint32_t bitfield = ntohl(*tempPtr);
+
+                if(clientBroadcast)
+                {
+                    clientSentAddress = address;
+                    clientSentAddressSet = true;
+                }
+                registerConnection(address, ID, serverPort);
+            }
+        }
+    } // elif(mode == CLIENT)
+}
+
+void GDT::Network::Connection::connectToServer(unsigned char a,
+                                 unsigned char b,
+                                 unsigned char c,
+                                 unsigned char d)
+{
+    connectToServer(((uint32_t)a << 24) | ((uint32_t)b << 16) |
+                    ((uint32_t)c << 8) | (uint32_t)d);
+}
+
+void GDT::Network::Connection::connectToServer(uint32_t address)
+{
+    if(mode != CLIENT)
+        return;
+
+#ifndef NDEBUG
+    std::cout << "CLIENT: storing server ip as " << GDT::Internal::Network::addressToString(address) << '\n';
+#endif
+
+    clientSentAddress = address;
+    clientSentAddressSet = true;
+}
+
+/*
+void Connection::sendPacket(sf::Packet& packet, sf::IpAddress address)
+{
+    connectionData.at(address.toInteger()).sendPacketQueue.push_front(PacketInfo(packet, address.toInteger()));
+}
+*/
+
+void GDT::Network::Connection::sendPacket(const std::vector<char>& packetData, uint32_t address)
+{
+    connectionData.at(address).sendPacketQueue.push_front(PacketInfo(
+        packetData,
+        std::chrono::steady_clock::time_point(),
+        address));
+}
+
+void GDT::Network::Connection::sendPacket(const char* packetData, uint32_t packetSize, uint32_t address)
+{
+    std::vector<char> data(packetData, packetData + packetSize);
+    connectionData.at(address).sendPacketQueue.push_front(PacketInfo(
+        data,
+        std::chrono::steady_clock::time_point(),
+        address));
+}
+
+float GDT::Network::Connection::getRtt()
+{
+    if(connectionData.empty())
+    {
+        return 0;
+    }
+    return connectionData.begin()->second.rtt.count() / 1000.0f;
+}
+
+float GDT::Network::Connection::getRtt(uint32_t address)
+{
+    if(connectionData.find(address) == connectionData.end())
+    {
+        return 0;
+    }
+    return connectionData.at(address).rtt.count() / 1000.0f;
+}
+
+void GDT::Network::Connection::setReceivedCallback(std::function<void(const char*, uint32_t, uint32_t, bool)> callback)
+{
+    receivedCallback = callback;
+}
+
+void GDT::Network::Connection::setConnectedCallback(std::function<void(uint32_t)> callback)
+{
+    connectedCallback = callback;
+}
+
+void GDT::Network::Connection::setDisconnectedCallback(std::function<void(uint32_t)> callback)
+{
+    disconnectedCallback = callback;
+}
+
+std::list<uint32_t> GDT::Network::Connection::getConnected()
+{
+    std::list<uint32_t> connectedList;
+
+    for(auto iter = connectionData.begin(); iter != connectionData.end(); ++iter)
+    {
+        connectedList.push_back(iter->first);
+    }
+
+    return connectedList;
+}
+
+unsigned int GDT::Network::Connection::getPacketQueueSize(uint32_t destinationAddress)
+{
+    auto connectionDataIter = connectionData.find(destinationAddress);
+    if(connectionDataIter == connectionData.end())
+    {
+        return 0;
+    }
+
+    return connectionDataIter->second.sendPacketQueue.size();
+}
+
+void GDT::Network::Connection::clearPacketQueue(uint32_t destinationAddress)
+{
+    auto connectionDataIter = connectionData.find(destinationAddress);
+    if(connectionDataIter == connectionData.end())
+    {
+        return;
+    }
+
+    connectionDataIter->second.sendPacketQueue.clear();
+}
+
+bool GDT::Network::Connection::connectionIsGood()
+{
+    auto connectionDataIter = connectionData.begin();
+    if(connectionDataIter == connectionData.end())
+    {
+        return false;
+    }
+
+    return connectionDataIter->second.isGood;
+}
+
+bool GDT::Network::Connection::connectionIsGood(uint32_t destinationAddress)
+{
+    auto connectionDataIter = connectionData.find(destinationAddress);
+    if(connectionDataIter == connectionData.end())
+    {
+        return false;
+    }
+
+    return connectionDataIter->second.isGood;
+}
+
+void GDT::Network::Connection::reset(Connection::Mode mode, unsigned short serverPort, unsigned short clientPort, bool clientBroadcast)
+{
+    this->mode = mode;
+    this->serverPort = serverPort;
+    this->clientPort = clientPort;
+#if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
+    if(validState) close(socketHandle);
+#else
+    if(validState) closesocket(socketHandle);
+#endif
+    connectionData.clear();
+    clientSentAddressSet = false;
+    initialized = false;
+    validState = false;
+    invalidNoticeTimer = INVALID_NOTICE_TIME;
+    clientRetryTimer = CLIENT_RETRY_TIME_SECONDS;
+    this->clientBroadcast = clientBroadcast;
+}
+
+void GDT::Network::Connection::setClientBroadcast(bool clientWillBroadcast)
+{
+    clientBroadcast = clientWillBroadcast;
+}
+
+void GDT::Network::Connection::registerConnection(uint32_t address, uint32_t ID, unsigned short port)
+{
+    if(mode == SERVER)
+    {
+        connectionData.insert(std::make_pair(address, ConnectionData(generateID(), 0, port)));
+    }
+    else if(mode == CLIENT)
+    {
+        connectionData.insert(std::make_pair(address, ConnectionData(ID, 1, port)));
+    }
+
+    connectionMade(address);
+}
+
+void GDT::Network::Connection::unregisterConnection(uint32_t address)
+{
+    if(connectionData.erase(address) != 0)
+    {
+        connectionLost(address);
+    }
+    else
+    {
+        std::cerr << "WARNING: unregisterConnection called with no matching connection!" << std::endl;
+    }
+}
+
+void GDT::Network::Connection::shiftBitfield(uint32_t address, uint32_t diff)
+{
+    connectionData.at(address).ackBitfield = (connectionData.at(address).ackBitfield >> diff) | (0x100000000 >> diff);
+}
+
+void GDT::Network::Connection::checkSentPackets(uint32_t ack, uint32_t bitfield, uint32_t address)
+{
+    if(!resendTimedOutPackets)
+        return;
+
+    --ack;
+    for(; bitfield != 0x0; bitfield = bitfield << 1)
+    {
+        // if received, don't bother checking
+        if((0x80000000 & bitfield) != 0x0)
+        {
+            --ack;
+            continue;
+        }
+
+        // not received by client yet, checking if packet timed out
+        for(auto iter = connectionData.at(address).sentPackets.begin(); iter != connectionData.at(address).sentPackets.end(); ++iter)
+        {
+            if(iter->id == ack)
+            {
+                // timed out, adding to send queue
+                auto duration = std::chrono::steady_clock::now() - iter->sentTime;
+                if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() >= PACKET_LOST_TIMEOUT_MILLISECONDS)
+                {
+#ifndef NDEBUG
+                    std::cout << "Packet " << ack << "(" << std::hex << std::showbase << ack << std::dec;
+                    std::cout << ") timed out\n";
+#endif
+                    std::vector<char> data = iter->data;
+                    uint32_t* convPtr = (uint32_t*)(data.data() + 8);
+                    uint32_t sequenceID = ntohl(*convPtr);
+                    data.erase(data.begin(), data.begin() + 12);
+                    sendPacket(data, address, sequenceID);
+                    iter->sentTime = std::chrono::steady_clock::now();
+                }
+                break;
+            }
+        }
+
+        --ack;
+    }
+}
+
+void GDT::Network::Connection::lookupRtt(uint32_t address, uint32_t ack)
+{
+    for(auto iter = connectionData.at(address).sentPackets.begin(); iter != connectionData.at(address).sentPackets.end(); ++iter)
+    {
+        if(iter->id == ack)
+        {
+            auto duration = std::chrono::steady_clock::now() - iter->sentTime;
+            if(duration > connectionData.at(address).rtt)
+            {
+                connectionData.at(address).rtt += (std::chrono::duration_cast<std::chrono::milliseconds>(duration) - connectionData.at(address).rtt) / 10;
+            }
+            else
+            {
+                connectionData.at(address).rtt -= (connectionData.at(address).rtt - std::chrono::duration_cast<std::chrono::milliseconds>(duration)) / 10;
+            }
+#ifndef NDEBUG
+            std::cout << "RTT of " << GDT::Internal::Network::addressToString(address) << " = " << connectionData.at(address).rtt.count() << '\n';
+#endif
+            connectionData.at(address).isGoodRtt = connectionData.at(address).rtt.count() <= GDT_INTERNAL_NETWORK_GOOD_RTT_LIMIT_MILLISECONDS;
+            break;
+        }
+    }
+}
+
+void GDT::Network::Connection::checkSentPacketsSize(uint32_t address)
+{
+    while(connectionData.at(address).sentPackets.size() > SENT_PACKET_LIST_MAX_SIZE)
+    {
+        connectionData.at(address).sentPackets.pop_back();
+    }
+}
+
+uint32_t GDT::Network::Connection::generateID()
+{
+    uint32_t id;
+    do
+    {
+        id = dist(rd);
+    } while (GDT::Internal::Network::IsSpecialID(id));
+
+    return id;
+}
+
+void GDT::Network::Connection::preparePacket(std::vector<char>& packetData, uint32_t& sequenceID, uint32_t address, bool isPing)
+{
+    assert(packetData.empty());
+
+    auto iter = connectionData.find(address);
+    assert(iter != connectionData.end());
+
+    uint32_t id = iter->second.id;
+
+    sequenceID = (iter->second.lSequence)++;
+
+    uint32_t ack = iter->second.rSequence;
+
+    uint32_t ackBitfield = iter->second.ackBitfield;
+
+    if(isPing)
+    {
+        char data[20];
+        uint32_t tempValue = htonl(GAME_PROTOCOL_ID);
+        std::memcpy(data, &tempValue, 4);
+        tempValue = htonl(GDT::Internal::Network::PING);
+        std::memcpy(data + 4, &tempValue, 4);
+        tempValue = htonl(sequenceID);
+        std::memcpy(data + 8, &tempValue, 4);
+        tempValue = htonl(ack);
+        std::memcpy(data + 12, &tempValue, 4);
+        tempValue = htonl(ackBitfield);
+        std::memcpy(data + 16, &tempValue, 4);
+        packetData.insert(packetData.end(), data, data + 20);
+    }
+    else
+    {
+        char data[20];
+        uint32_t tempValue = htonl(GAME_PROTOCOL_ID);
+        std::memcpy(data, &tempValue, 4);
+        tempValue = htonl(id);
+        std::memcpy(data + 4, &tempValue, 4);
+        tempValue = htonl(sequenceID);
+        std::memcpy(data + 8, &tempValue, 4);
+        tempValue = htonl(ack);
+        std::memcpy(data + 12, &tempValue, 4);
+        tempValue = htonl(ackBitfield);
+        std::memcpy(data + 16, &tempValue, 4);
+        packetData.insert(packetData.end(), data, data + 20);
+    }
+}
+
+void GDT::Network::Connection::sendPacket(const std::vector<char>& data, uint32_t address, uint32_t resendingID)
+{
+    connectionData.at(address).sendPacketQueue.push_front(PacketInfo(data, std::chrono::steady_clock::time_point(), address, resendingID, true));
+}
+
+void GDT::Network::Connection::receivedPacket(const char* data, uint32_t count, uint32_t address, bool outOfOrder)
+{
+    if(receivedCallback && count > 0)
+    {
+        receivedCallback(data, count, address, outOfOrder);
+    }
+}
+
+void GDT::Network::Connection::connectionMade(uint32_t address)
+{
+    if(connectedCallback)
+    {
+        connectedCallback(address);
+    }
+}
+
+void GDT::Network::Connection::connectionLost(uint32_t address)
+{
+    if(disconnectedCallback)
+    {
+        disconnectedCallback(address);
+    }
+}
+
+void GDT::Network::Connection::initialize()
+{
+    if(validState)
+    {
+        return;
+    }
+
+    socketHandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if(socketHandle <= 0)
+    {
+        validState = false;
+#ifndef NDEBUG
+        std::cout << "ERROR: Failed to get socket!" << std::endl;
+#endif
+        return;
+    }
+
+    socketInfo.sin_family = AF_INET;
+    socketInfo.sin_addr.s_addr = INADDR_ANY;
+    if(mode == CLIENT)
+    {
+        socketInfo.sin_port = htons(clientPort);
+    }
+    else
+    {
+        socketInfo.sin_port = htons(serverPort);
+    }
+
+    if(bind(socketHandle, (const sockaddr*) &socketInfo, sizeof(sockaddr_in)) < 0)
+    {
+        validState = false;
+#ifndef NDEBUG
+        std::cout << "ERROR: Failed to bind socket!" << std::endl;
+#endif
+        return;
+    }
+
+#if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
+    int nonblocking = 1;
+    if(fcntl(socketHandle, F_SETFL, O_NONBLOCK, nonblocking) == -1)
+    {
+        validState = false;
+#ifndef NDEBUG
+        std::cout << "ERROR: Failed to set socket non-blocking!" << std::endl;
+#endif
+        return;
+    }
+#else
+    DWORD nonblocking = 1;
+    if(ioctlsocket(socketHandle, FIONBIO, &nonblocking) != 0)
+    {
+        validState = false;
+#ifndef NDEBUG
+        std::cout << "ERROR: Failed to set socket non-blocking!" << std::endl;
+#endif
+        return;
+    }
+#endif
+
+    validState = true;
+}
+

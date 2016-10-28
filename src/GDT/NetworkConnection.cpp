@@ -596,8 +596,6 @@ void GDT::Network::Connection::update(float deltaTime)
                 std::cout << "CLIENT: Establishing connection with server..." << std::endl;
 #endif
                 clientRetryTimer = 0.0f;
-//                sf::Packet packet;
-//                packet << (sf::Uint32) GAME_PROTOCOL_ID << (sf::Uint32) network::CONNECT << (sf::Uint32) 0 << (sf::Uint32) 0 << (sf::Uint32) 0xFFFFFFFF;
                 char data[20];
                 uint32_t temp = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
                 memcpy(data, &temp, 4);
@@ -703,13 +701,6 @@ void GDT::Network::Connection::connectToServer(uint32_t address)
     clientSentAddress = address;
     clientSentAddressSet = true;
 }
-
-/*
-void Connection::sendPacket(sf::Packet& packet, sf::IpAddress address)
-{
-    connectionData.at(address.toInteger()).sendPacketQueue.push_front(PacketInfo(packet, address.toInteger()));
-}
-*/
 
 void GDT::Network::Connection::sendPacket(const std::vector<char>& packetData, uint32_t address)
 {

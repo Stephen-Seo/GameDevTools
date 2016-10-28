@@ -132,7 +132,10 @@ int main(int argc, char** argv)
         clientPort,
         willBroadcast);
 
-    connection.connectToServer(serverIP);
+    if(!willBroadcast)
+    {
+        connection.connectToServer(serverIP);
+    }
 
     float timer = 0;
 

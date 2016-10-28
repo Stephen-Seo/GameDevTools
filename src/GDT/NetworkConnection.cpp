@@ -713,19 +713,23 @@ void Connection::sendPacket(sf::Packet& packet, sf::IpAddress address)
 
 void GDT::Network::Connection::sendPacket(const std::vector<char>& packetData, uint32_t address)
 {
-    connectionData.at(address).sendPacketQueue.push_front(PacketInfo(
-        packetData,
-        std::chrono::steady_clock::time_point(),
-        address));
+    if(connectionData.find(address) == connectionData.end())
+    {
+        std::clog << "WARNING: Tried to queue packet to nonexistent recipient!" << std::endl;
+    }
+    else
+    {
+        connectionData.at(address).sendPacketQueue.push_front(PacketInfo(
+            packetData,
+            std::chrono::steady_clock::time_point(),
+            address));
+    }
 }
 
 void GDT::Network::Connection::sendPacket(const char* packetData, uint32_t packetSize, uint32_t address)
 {
     std::vector<char> data(packetData, packetData + packetSize);
-    connectionData.at(address).sendPacketQueue.push_front(PacketInfo(
-        data,
-        std::chrono::steady_clock::time_point(),
-        address));
+    sendPacket(data, address);
 }
 
 float GDT::Network::Connection::getRtt()

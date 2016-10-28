@@ -613,7 +613,16 @@ void GDT::Network::Connection::update(float deltaTime)
                 destinationInfo.sin_port = htons(serverPort);
                 if(clientBroadcast)
                 {
-                    destinationInfo.sin_addr.s_addr = 0xFFFFFFFF;
+                    uint32_t broadcastAddress = GDT::Internal::Network::getBroadcastAddress();
+                    if(broadcastAddress == 0)
+                    {
+                        std::cerr << "WARNING: Failed to get local address!" << std::endl;
+                        destinationInfo.sin_addr.s_addr = 0xFFFFFFFF;
+                    }
+                    else
+                    {
+                        destinationInfo.sin_addr.s_addr = htonl(broadcastAddress);
+                    }
                 }
                 else
                 {
@@ -1036,6 +1045,7 @@ void GDT::Network::Connection::initialize()
         return;
     }
 
+    // get socket handle (file descriptor)
     socketHandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if(socketHandle <= 0)
     {
@@ -1046,6 +1056,7 @@ void GDT::Network::Connection::initialize()
         return;
     }
 
+    // set socket info
     socketInfo.sin_family = AF_INET;
     socketInfo.sin_addr.s_addr = INADDR_ANY;
     if(mode == CLIENT)
@@ -1057,6 +1068,7 @@ void GDT::Network::Connection::initialize()
         socketInfo.sin_port = htons(serverPort);
     }
 
+    // bind socketInfo to socket
     if(bind(socketHandle, (const sockaddr*) &socketInfo, sizeof(sockaddr_in)) < 0)
     {
         validState = false;
@@ -1066,6 +1078,7 @@ void GDT::Network::Connection::initialize()
         return;
     }
 
+    // set nonblocking
 #if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
     int nonblocking = 1;
     if(fcntl(socketHandle, F_SETFL, O_NONBLOCK, nonblocking) == -1)
@@ -1087,6 +1100,13 @@ void GDT::Network::Connection::initialize()
         return;
     }
 #endif
+
+    if(clientBroadcast)
+    {
+        // set enable broadcast
+        int enabled = 1;
+        setsockopt(socketHandle, SOL_SOCKET, SO_BROADCAST, &enabled, sizeof(enabled));
+    }
 
     validState = true;
 }

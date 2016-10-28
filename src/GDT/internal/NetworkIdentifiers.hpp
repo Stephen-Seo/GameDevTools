@@ -102,6 +102,10 @@ void CleanupSockets();
 
 std::string addressToString(const uint32_t& address);
 
+uint32_t getLocalIP();
+
+uint32_t getBroadcastAddress();
+
 } // namespace Network
 } // namespace Internal
 } // namespace GDT

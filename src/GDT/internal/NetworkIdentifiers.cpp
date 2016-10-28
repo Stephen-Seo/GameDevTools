@@ -1,6 +1,17 @@
 
 #include "NetworkIdentifiers.hpp"
 
+#include <unistd.h>
+#if PLATFORM != PLATFORM_WINDOWS
+ #include <netdb.h>
+ #include <ifaddrs.h>
+ #include <net/if.h>
+#endif
+
+#ifndef NDEBUG
+ #include <iostream>
+#endif
+
 std::atomic_uint_fast32_t GDT::Internal::Network::connectionInstanceCount{};
 
 GDT::Internal::Network::PacketInfo::PacketInfo() :
@@ -91,6 +102,122 @@ std::string GDT::Internal::Network::addressToString(const uint32_t& address)
         std::to_string((address >> 16) & 0xFF) + std::string(".") +
         std::to_string((address >> 8) & 0xFF) + std::string(".") +
         std::to_string(address & 0xFF);
+}
+
+uint32_t GDT::Internal::Network::getLocalIP()
+{
+    // initialize if not initialized
+    if(connectionInstanceCount++ == 0)
+    {
+        if(!InitializeSockets())
+        {
+            --connectionInstanceCount;
+            return 0;
+        }
+    }
+
+    auto cleanupF = [] () {
+        if(--connectionInstanceCount == 0)
+        {
+            CleanupSockets();
+        }
+    };
+
+    // get hostname
+    char hostname[256];
+    if(gethostname(hostname, 256) != 0)
+    {
+        cleanupF();
+        return 0;
+    }
+
+    // get local address
+    hostent *host = gethostbyname(hostname);
+    if(host == nullptr)
+    {
+        cleanupF();
+        return 0;
+    }
+
+    uint32_t address =
+        ntohl(((in_addr*)(host->h_addr))->s_addr);
+
+    // cleanup if only this function requires initialized state
+    cleanupF();
+
+#ifndef NDEBUG
+    std::cout << "getLocalIP(): Got address " << addressToString(address) << std::endl;
+#endif
+
+    return address;
+}
+
+uint32_t GDT::Internal::Network::getBroadcastAddress()
+{
+    // initialize if not initialized
+    if(connectionInstanceCount++ == 0)
+    {
+        if(!InitializeSockets())
+        {
+            --connectionInstanceCount;
+            return 0;
+        }
+    }
+
+    auto cleanupF = [] () {
+        if(--connectionInstanceCount == 0)
+        {
+            CleanupSockets();
+        }
+    };
+
+    ifaddrs* ifaddrsInfo;
+    if(getifaddrs(&ifaddrsInfo) != 0)
+    {
+        cleanupF();
+        return 0;
+    }
+
+    uint32_t localIP = getLocalIP();
+    uint32_t broadcastAddress = 0;
+    do
+    {
+        sockaddr_in* sockaddrInfo = (sockaddr_in*)(ifaddrsInfo->ifa_addr);
+        if(sockaddrInfo != nullptr)
+        {
+            if(localIP == ntohl(sockaddrInfo->sin_addr.s_addr))
+            {
+                if((ifaddrsInfo->ifa_flags | IFF_BROADCAST) != 0)
+                {
+                    sockaddr_in* broadcastInfo = (sockaddr_in*)(ifaddrsInfo->ifa_ifu.ifu_broadaddr);
+                    if(broadcastInfo != nullptr)
+                    {
+                        broadcastAddress = ntohl(broadcastInfo->sin_addr.s_addr);
+#ifndef NDEBUG
+                        std::cout << "getBroadcastAddress(): got " << addressToString(broadcastAddress) << std::endl;
+#endif
+                        cleanupF();
+                        return broadcastAddress;
+                    }
+                    else
+                    {
+                        cleanupF();
+                        return 0;
+                    }
+                }
+                else
+                {
+                    cleanupF();
+                    return 0;
+                }
+            }
+        }
+        ifaddrsInfo = ifaddrsInfo->ifa_next;
+    } while (ifaddrsInfo != nullptr);
+
+    // cleanup if only this function requires initialized state
+    cleanupF();
+    return 0;
 }
 
 std::size_t std::hash<GDT::Internal::Network::ConnectionData>::operator() (const GDT::Internal::Network::ConnectionData& connectionData) const

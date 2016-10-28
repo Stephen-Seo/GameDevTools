@@ -6,6 +6,8 @@
 
 namespace GDT
 {
+namespace Internal
+{
     bool isBigEndian()
     {
         union {
@@ -15,6 +17,7 @@ namespace GDT
 
         return bint.c[0] == 1;
     }
+}
 }
 
 #endif

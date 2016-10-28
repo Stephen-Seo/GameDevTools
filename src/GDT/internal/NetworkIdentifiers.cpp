@@ -117,6 +117,7 @@ uint32_t GDT::Internal::Network::getLocalIP()
     }
 
     auto cleanupF = [] () {
+        // cleanup if only this function requires initialized state
         if(--connectionInstanceCount == 0)
         {
             CleanupSockets();
@@ -124,8 +125,8 @@ uint32_t GDT::Internal::Network::getLocalIP()
     };
 
     // get hostname
-    char hostname[256];
-    if(gethostname(hostname, 256) != 0)
+    char hostname[1024];
+    if(gethostname(hostname, 1024) != 0)
     {
         cleanupF();
         return 0;
@@ -142,7 +143,6 @@ uint32_t GDT::Internal::Network::getLocalIP()
     uint32_t address =
         ntohl(((in_addr*)(host->h_addr))->s_addr);
 
-    // cleanup if only this function requires initialized state
     cleanupF();
 
 #ifndef NDEBUG
@@ -152,6 +152,7 @@ uint32_t GDT::Internal::Network::getLocalIP()
     return address;
 }
 
+#if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
 uint32_t GDT::Internal::Network::getBroadcastAddress()
 {
     // initialize if not initialized
@@ -165,6 +166,7 @@ uint32_t GDT::Internal::Network::getBroadcastAddress()
     }
 
     auto cleanupF = [] () {
+        // cleanup if only this function requires initialized state
         if(--connectionInstanceCount == 0)
         {
             CleanupSockets();
@@ -215,10 +217,10 @@ uint32_t GDT::Internal::Network::getBroadcastAddress()
         ifaddrsInfo = ifaddrsInfo->ifa_next;
     } while (ifaddrsInfo != nullptr);
 
-    // cleanup if only this function requires initialized state
     cleanupF();
     return 0;
 }
+#endif
 
 std::size_t std::hash<GDT::Internal::Network::ConnectionData>::operator() (const GDT::Internal::Network::ConnectionData& connectionData) const
 {

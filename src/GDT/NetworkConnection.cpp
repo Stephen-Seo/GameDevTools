@@ -613,6 +613,7 @@ void GDT::Network::Connection::update(float deltaTime)
                 destinationInfo.sin_port = htons(serverPort);
                 if(clientBroadcast)
                 {
+#if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
                     uint32_t broadcastAddress = GDT::Internal::Network::getBroadcastAddress();
                     if(broadcastAddress == 0)
                     {
@@ -623,6 +624,9 @@ void GDT::Network::Connection::update(float deltaTime)
                     {
                         destinationInfo.sin_addr.s_addr = htonl(broadcastAddress);
                     }
+#else
+                    destinationInfo.sin_addr.s_addr = 0xFFFFFFFF;
+#endif
                 }
                 else
                 {
@@ -1104,7 +1108,11 @@ void GDT::Network::Connection::initialize()
     if(clientBroadcast)
     {
         // set enable broadcast
+#if PLATFORM == PLATFORM_WINDOWS
+        char enabled = 1;
+#else
         int enabled = 1;
+#endif
         setsockopt(socketHandle, SOL_SOCKET, SO_BROADCAST, &enabled, sizeof(enabled));
     }
 

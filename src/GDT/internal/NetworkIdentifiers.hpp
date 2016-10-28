@@ -104,7 +104,9 @@ std::string addressToString(const uint32_t& address);
 
 uint32_t getLocalIP();
 
+#if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
 uint32_t getBroadcastAddress();
+#endif
 
 } // namespace Network
 } // namespace Internal

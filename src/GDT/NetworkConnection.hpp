@@ -53,7 +53,7 @@ public:
         \param clientPort The port of the client. By default is 0, which tells the client to bind to any available UDP port. Otherwise binds to the specified port.
         \param clientBroadcast If true (and is CLIENT), then when initiating a connection to a server, the client will send to the broadcast address (255.255.255.255) when establishing a connection and will expect the server to respond from an unknown address. Note that this will only work if the server is on the same network, as sending to the broadcast ip address will only send to the current network.
     */
-    Connection(Mode mode = SERVER, unsigned short serverPort = GDT_NETWORK_SERVER_PORT, unsigned short clientPort = 0, bool clientBroadcast = false);
+    Connection(Mode mode = SERVER, unsigned short serverPort = GDT_INTERNAL_NETWORK_SERVER_PORT, unsigned short clientPort = 0, bool clientBroadcast = false);
 
     ~Connection();
     /// If true, then the SERVER will accept new connections and the CLIENT will accept a connection to a server.
@@ -187,7 +187,7 @@ public:
         \param clientPort The port of the client. By default is 0, which tells the client to bind to any available UDP port. Otherwise binds to the specified port.
         \param clientBroadcast If true (and is CLIENT), then when initiating a connection to a server, the client will send to the broadcast address (255.255.255.255) when establishing a connection and will expect the server to respond from an unknown address. Note that this will only work if the server is on the same network, as sending to the broadcast ip address will only send to the current network.
     */
-    void reset(Mode mode, unsigned short serverPort = GDT_NETWORK_SERVER_PORT, unsigned short clientPort = 0, bool clientBroadcast = false);
+    void reset(Mode mode, unsigned short serverPort = GDT_INTERNAL_NETWORK_SERVER_PORT, unsigned short clientPort = 0, bool clientBroadcast = false);
 
     /// Sets whether or not the Client will broadcast when initiating a connection to a server.
     /**

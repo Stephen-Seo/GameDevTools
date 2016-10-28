@@ -15,7 +15,7 @@ validState(false),
 invalidNoticeTimer(INVALID_NOTICE_TIME),
 serverPort(serverPort),
 clientPort(clientPort),
-clientRetryTimer(CLIENT_RETRY_TIME_SECONDS),
+clientRetryTimer(GDT_INTERNAL_NETWORK_CLIENT_RETRY_TIME_SECONDS),
 clientBroadcast(clientBroadcast)
 {
     if(GDT::Internal::Network::connectionInstanceCount++ == 0)
@@ -123,7 +123,7 @@ void GDT::Network::Connection::update(float deltaTime)
         }
 
         iter->second.timer += deltaTime;
-        if(iter->second.timer >= (iter->second.isGood ? NETWORK_GOOD_MODE_SEND_INTERVAL : NETWORK_BAD_MODE_SEND_INTERVAL))
+        if(iter->second.timer >= (iter->second.isGood ? GDT_INTERNAL_NETWORK_GOOD_MODE_SEND_INTERVAL : GDT_INTERNAL_NETWORK_BAD_MODE_SEND_INTERVAL))
         {
             iter->second.timer = 0.0f;
             iter->second.triggerSend = true;
@@ -137,7 +137,7 @@ void GDT::Network::Connection::update(float deltaTime)
         for(auto iter = connectionData.begin(); iter != connectionData.end(); ++iter)
         {
             auto duration = std::chrono::steady_clock::now() - iter->second.elapsedTime;
-            if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() >= CONNECTION_TIMEOUT_MILLISECONDS)
+            if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() >= GDT_INTERNAL_NETWORK_CONNECTION_TIMEOUT_MILLISECONDS)
             {
                 disconnectQueue.push_front(iter->first);
             }
@@ -257,7 +257,7 @@ void GDT::Network::Connection::update(float deltaTime)
             uint32_t protocolID = ntohl(*tempPtr);
 
             // check protocol ID
-            if(protocolID != GAME_PROTOCOL_ID)
+            if(protocolID != GDT_INTERNAL_NETWORK_PROTOCOL_ID)
                 return;
 
             tempPtr = (uint32_t*)(data.data() + 4);
@@ -381,7 +381,7 @@ void GDT::Network::Connection::update(float deltaTime)
         {
             // check if timed out
             auto duration = std::chrono::steady_clock::now() - connectionData.at(serverAddress).elapsedTime;
-            if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() > CONNECTION_TIMEOUT_MILLISECONDS)
+            if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() > GDT_INTERNAL_NETWORK_CONNECTION_TIMEOUT_MILLISECONDS)
             {
 #ifndef NDEBUG
                 std::cout << "Disconnected from server " << GDT::Internal::Network::addressToString(serverAddress) << '\n';
@@ -490,7 +490,7 @@ void GDT::Network::Connection::update(float deltaTime)
                 uint32_t* tempPtr = (uint32_t*)data.data();
                 uint32_t protocolID = ntohl(*tempPtr);
 
-                if(protocolID != GAME_PROTOCOL_ID)
+                if(protocolID != GDT_INTERNAL_NETWORK_PROTOCOL_ID)
                     return;
 
                 tempPtr = (uint32_t*)(data.data() + 4);
@@ -590,7 +590,7 @@ void GDT::Network::Connection::update(float deltaTime)
         {
             // check retry timer
             clientRetryTimer += deltaTime;
-            if(clientRetryTimer >= CLIENT_RETRY_TIME_SECONDS && (clientSentAddressSet || clientBroadcast))
+            if(clientRetryTimer >= GDT_INTERNAL_NETWORK_CLIENT_RETRY_TIME_SECONDS && (clientSentAddressSet || clientBroadcast))
             {
 #ifndef NDEBUG
                 std::cout << "CLIENT: Establishing connection with server..." << std::endl;
@@ -599,7 +599,7 @@ void GDT::Network::Connection::update(float deltaTime)
 //                sf::Packet packet;
 //                packet << (sf::Uint32) GAME_PROTOCOL_ID << (sf::Uint32) network::CONNECT << (sf::Uint32) 0 << (sf::Uint32) 0 << (sf::Uint32) 0xFFFFFFFF;
                 char data[20];
-                uint32_t temp = htonl(GAME_PROTOCOL_ID);
+                uint32_t temp = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
                 memcpy(data, &temp, 4);
                 temp = htonl(GDT::Internal::Network::CONNECT);
                 memcpy(data + 4, &temp, 4);
@@ -659,7 +659,7 @@ void GDT::Network::Connection::update(float deltaTime)
                 uint32_t* tempPtr = (uint32_t*)data.data();
                 uint32_t protocolID = ntohl(*tempPtr);
 
-                if(protocolID != GAME_PROTOCOL_ID)
+                if(protocolID != GDT_INTERNAL_NETWORK_PROTOCOL_ID)
                     return;
 
                 tempPtr = (uint32_t*)(data.data() + 4);
@@ -836,7 +836,7 @@ void GDT::Network::Connection::reset(Connection::Mode mode, unsigned short serve
     initialized = false;
     validState = false;
     invalidNoticeTimer = INVALID_NOTICE_TIME;
-    clientRetryTimer = CLIENT_RETRY_TIME_SECONDS;
+    clientRetryTimer = GDT_INTERNAL_NETWORK_CLIENT_RETRY_TIME_SECONDS;
     this->clientBroadcast = clientBroadcast;
 }
 
@@ -898,7 +898,7 @@ void GDT::Network::Connection::checkSentPackets(uint32_t ack, uint32_t bitfield,
             {
                 // timed out, adding to send queue
                 auto duration = std::chrono::steady_clock::now() - iter->sentTime;
-                if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() >= PACKET_LOST_TIMEOUT_MILLISECONDS)
+                if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() >= GDT_INTERNAL_NETWORK_PACKET_LOST_TIMEOUT_MILLISECONDS)
                 {
 #ifndef NDEBUG
                     std::cout << "Packet " << ack << "(" << std::hex << std::showbase << ack << std::dec;
@@ -945,7 +945,7 @@ void GDT::Network::Connection::lookupRtt(uint32_t address, uint32_t ack)
 
 void GDT::Network::Connection::checkSentPacketsSize(uint32_t address)
 {
-    while(connectionData.at(address).sentPackets.size() > SENT_PACKET_LIST_MAX_SIZE)
+    while(connectionData.at(address).sentPackets.size() > GDT_INTERNAL_NETWORK_SENT_PACKET_LIST_MAX_SIZE)
     {
         connectionData.at(address).sentPackets.pop_back();
     }
@@ -980,7 +980,7 @@ void GDT::Network::Connection::preparePacket(std::vector<char>& packetData, uint
     if(isPing)
     {
         char data[20];
-        uint32_t tempValue = htonl(GAME_PROTOCOL_ID);
+        uint32_t tempValue = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
         std::memcpy(data, &tempValue, 4);
         tempValue = htonl(GDT::Internal::Network::PING);
         std::memcpy(data + 4, &tempValue, 4);
@@ -995,7 +995,7 @@ void GDT::Network::Connection::preparePacket(std::vector<char>& packetData, uint
     else
     {
         char data[20];
-        uint32_t tempValue = htonl(GAME_PROTOCOL_ID);
+        uint32_t tempValue = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
         std::memcpy(data, &tempValue, 4);
         tempValue = htonl(id);
         std::memcpy(data + 4, &tempValue, 4);

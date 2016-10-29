@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 project(GameDevTools)
 
 set(GameDevTools_SOURCES
-    src/GDT/internal/NetworkIdentifiers.cpp
+    src/GDT/Internal/NetworkIdentifiers.cpp
     src/GDT/GameLoop.cpp
     src/GDT/NetworkConnection.cpp
     src/GDT/SceneNode.cpp

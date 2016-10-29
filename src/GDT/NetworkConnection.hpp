@@ -12,7 +12,7 @@
 
 #include <iostream>
 
-#include "internal/NetworkIdentifiers.hpp"
+#include "Internal/NetworkIdentifiers.hpp"
 
 namespace GDT
 {
@@ -22,7 +22,7 @@ namespace Network
 /// Implements a UDP based connection manager as client or server.
 /**
     The implementation is based on http://gafferongames.com/networking-for-game-programmers/ .
-    Note that this class uses structs and such defined in "GDT/internal/NetworkIdentifiers.hpp".
+    Note that this class uses structs and such defined in "GDT/Internal/NetworkIdentifiers.hpp".
     Thus, this class uses struct \ref ConnectionData which uses \ref PacketInfo.
 
     It is expected that Connection::update is called periodically from within

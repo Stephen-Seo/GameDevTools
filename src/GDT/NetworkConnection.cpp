@@ -613,7 +613,6 @@ void GDT::Network::Connection::update(float deltaTime)
                 destinationInfo.sin_port = htons(serverPort);
                 if(clientBroadcast)
                 {
-#if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
                     uint32_t broadcastAddress = GDT::Internal::Network::getBroadcastAddress();
                     if(broadcastAddress == 0)
                     {
@@ -624,9 +623,6 @@ void GDT::Network::Connection::update(float deltaTime)
                     {
                         destinationInfo.sin_addr.s_addr = htonl(broadcastAddress);
                     }
-#else
-                    destinationInfo.sin_addr.s_addr = 0xFFFFFFFF;
-#endif
                 }
                 else
                 {

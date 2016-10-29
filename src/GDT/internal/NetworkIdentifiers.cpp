@@ -37,6 +37,7 @@ GDT::Internal::Network::ConnectionData::ConnectionData() :
 elapsedTime(std::chrono::steady_clock::now()),
 rSequence(0),
 ackBitfield(0xFFFFFFFF),
+rtt(std::chrono::milliseconds(1000)),
 triggerSend(false),
 timer(0.0f),
 isGood(false),
@@ -52,6 +53,7 @@ id(id),
 lSequence(lSequence),
 rSequence(0),
 ackBitfield(0xFFFFFFFF),
+rtt(std::chrono::milliseconds(1000)),
 triggerSend(false),
 timer(0.0f),
 isGood(false),
@@ -152,9 +154,11 @@ uint32_t GDT::Internal::Network::getLocalIP()
     return address;
 }
 
-#if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
 uint32_t GDT::Internal::Network::getBroadcastAddress()
 {
+#if PLATFORM == PLATFORM_WINDOWS
+    return 0xFFFFFFFF;
+#else
     // initialize if not initialized
     if(connectionInstanceCount++ == 0)
     {
@@ -174,11 +178,17 @@ uint32_t GDT::Internal::Network::getBroadcastAddress()
     };
 
     ifaddrs* ifaddrsInfo;
+    ifaddrs* ifaddrsInfoHead;
     if(getifaddrs(&ifaddrsInfo) != 0)
     {
         cleanupF();
         return 0;
     }
+
+    ifaddrsInfoHead = ifaddrsInfo;
+    auto cleanupIfaddrsInfo = [&ifaddrsInfoHead] () {
+        freeifaddrs(ifaddrsInfoHead);
+    };
 
     uint32_t localIP = getLocalIP();
     uint32_t broadcastAddress = 0;
@@ -199,17 +209,20 @@ uint32_t GDT::Internal::Network::getBroadcastAddress()
                         std::cout << "getBroadcastAddress(): got " << addressToString(broadcastAddress) << std::endl;
 #endif
                         cleanupF();
+                        cleanupIfaddrsInfo();
                         return broadcastAddress;
                     }
                     else
                     {
                         cleanupF();
+                        cleanupIfaddrsInfo();
                         return 0;
                     }
                 }
                 else
                 {
                     cleanupF();
+                    cleanupIfaddrsInfo();
                     return 0;
                 }
             }
@@ -218,9 +231,10 @@ uint32_t GDT::Internal::Network::getBroadcastAddress()
     } while (ifaddrsInfo != nullptr);
 
     cleanupF();
+    cleanupIfaddrsInfo();
     return 0;
-}
 #endif
+}
 
 std::size_t std::hash<GDT::Internal::Network::ConnectionData>::operator() (const GDT::Internal::Network::ConnectionData& connectionData) const
 {

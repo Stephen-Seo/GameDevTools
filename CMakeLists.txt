@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.0)
 
 project(GameDevTools)
 
@@ -21,6 +22,10 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 add_library(GameDevTools ${GameDevTools_SOURCES})
+
+if(WIN32)
+    target_link_libraries(GameDevTools ws2_32)
+endif()
 
 find_package(GTest)
 

@@ -1,3 +1,0 @@
-
-build with mingw w64 (windows binary) requires flag "-lws2_32" after objects list
-

@@ -126,7 +126,7 @@ int main(int argc, char** argv)
         return 7;
     }
 
-    using Connection = GDT::Network::Connection;
+    using Connection = GDT::NetworkConnection;
     Connection connection(isServer ? Connection::SERVER : Connection::CLIENT,
         serverPort,
         clientPort,

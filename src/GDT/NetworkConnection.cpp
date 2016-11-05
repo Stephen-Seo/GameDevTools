@@ -4,7 +4,7 @@
 #include <cstring>
 #include <unistd.h>
 
-GDT::Network::Connection::Connection(Mode mode, unsigned short serverPort, unsigned short clientPort, bool clientBroadcast) :
+GDT::NetworkConnection::NetworkConnection(Mode mode, unsigned short serverPort, unsigned short clientPort, bool clientBroadcast) :
 acceptNewConnections(true),
 ignoreOutOfSequence(false),
 resendTimedOutPackets(true),
@@ -29,7 +29,7 @@ clientBroadcast(clientBroadcast)
     }
 }
 
-GDT::Network::Connection::~Connection()
+GDT::NetworkConnection::~NetworkConnection()
 {
     if(validState)
     {
@@ -46,7 +46,7 @@ GDT::Network::Connection::~Connection()
     }
 }
 
-void GDT::Network::Connection::update(float deltaTime)
+void GDT::NetworkConnection::update(float deltaTime)
 {
     if(!initialized)
     {
@@ -689,7 +689,7 @@ void GDT::Network::Connection::update(float deltaTime)
     } // elif(mode == CLIENT)
 }
 
-void GDT::Network::Connection::connectToServer(unsigned char a,
+void GDT::NetworkConnection::connectToServer(unsigned char a,
                                  unsigned char b,
                                  unsigned char c,
                                  unsigned char d)
@@ -698,7 +698,7 @@ void GDT::Network::Connection::connectToServer(unsigned char a,
                     ((uint32_t)c << 8) | (uint32_t)d);
 }
 
-void GDT::Network::Connection::connectToServer(uint32_t address)
+void GDT::NetworkConnection::connectToServer(uint32_t address)
 {
     if(mode != CLIENT)
         return;
@@ -711,7 +711,7 @@ void GDT::Network::Connection::connectToServer(uint32_t address)
     clientSentAddressSet = true;
 }
 
-void GDT::Network::Connection::sendPacket(const std::vector<char>& packetData, uint32_t address)
+void GDT::NetworkConnection::sendPacket(const std::vector<char>& packetData, uint32_t address)
 {
     if(connectionData.find(address) == connectionData.end())
     {
@@ -726,13 +726,13 @@ void GDT::Network::Connection::sendPacket(const std::vector<char>& packetData, u
     }
 }
 
-void GDT::Network::Connection::sendPacket(const char* packetData, uint32_t packetSize, uint32_t address)
+void GDT::NetworkConnection::sendPacket(const char* packetData, uint32_t packetSize, uint32_t address)
 {
     std::vector<char> data(packetData, packetData + packetSize);
     sendPacket(data, address);
 }
 
-float GDT::Network::Connection::getRtt()
+float GDT::NetworkConnection::getRtt()
 {
     if(connectionData.empty())
     {
@@ -741,7 +741,7 @@ float GDT::Network::Connection::getRtt()
     return connectionData.begin()->second.rtt.count() / 1000.0f;
 }
 
-float GDT::Network::Connection::getRtt(uint32_t address)
+float GDT::NetworkConnection::getRtt(uint32_t address)
 {
     if(connectionData.find(address) == connectionData.end())
     {
@@ -750,22 +750,22 @@ float GDT::Network::Connection::getRtt(uint32_t address)
     return connectionData.at(address).rtt.count() / 1000.0f;
 }
 
-void GDT::Network::Connection::setReceivedCallback(std::function<void(const char*, uint32_t, uint32_t, bool)> callback)
+void GDT::NetworkConnection::setReceivedCallback(std::function<void(const char*, uint32_t, uint32_t, bool)> callback)
 {
     receivedCallback = callback;
 }
 
-void GDT::Network::Connection::setConnectedCallback(std::function<void(uint32_t)> callback)
+void GDT::NetworkConnection::setConnectedCallback(std::function<void(uint32_t)> callback)
 {
     connectedCallback = callback;
 }
 
-void GDT::Network::Connection::setDisconnectedCallback(std::function<void(uint32_t)> callback)
+void GDT::NetworkConnection::setDisconnectedCallback(std::function<void(uint32_t)> callback)
 {
     disconnectedCallback = callback;
 }
 
-std::list<uint32_t> GDT::Network::Connection::getConnected()
+std::list<uint32_t> GDT::NetworkConnection::getConnected()
 {
     std::list<uint32_t> connectedList;
 
@@ -777,7 +777,7 @@ std::list<uint32_t> GDT::Network::Connection::getConnected()
     return connectedList;
 }
 
-unsigned int GDT::Network::Connection::getPacketQueueSize(uint32_t destinationAddress)
+unsigned int GDT::NetworkConnection::getPacketQueueSize(uint32_t destinationAddress)
 {
     auto connectionDataIter = connectionData.find(destinationAddress);
     if(connectionDataIter == connectionData.end())
@@ -788,7 +788,7 @@ unsigned int GDT::Network::Connection::getPacketQueueSize(uint32_t destinationAd
     return connectionDataIter->second.sendPacketQueue.size();
 }
 
-void GDT::Network::Connection::clearPacketQueue(uint32_t destinationAddress)
+void GDT::NetworkConnection::clearPacketQueue(uint32_t destinationAddress)
 {
     auto connectionDataIter = connectionData.find(destinationAddress);
     if(connectionDataIter == connectionData.end())
@@ -799,7 +799,7 @@ void GDT::Network::Connection::clearPacketQueue(uint32_t destinationAddress)
     connectionDataIter->second.sendPacketQueue.clear();
 }
 
-bool GDT::Network::Connection::connectionIsGood()
+bool GDT::NetworkConnection::connectionIsGood()
 {
     auto connectionDataIter = connectionData.begin();
     if(connectionDataIter == connectionData.end())
@@ -810,7 +810,7 @@ bool GDT::Network::Connection::connectionIsGood()
     return connectionDataIter->second.isGood;
 }
 
-bool GDT::Network::Connection::connectionIsGood(uint32_t destinationAddress)
+bool GDT::NetworkConnection::connectionIsGood(uint32_t destinationAddress)
 {
     auto connectionDataIter = connectionData.find(destinationAddress);
     if(connectionDataIter == connectionData.end())
@@ -821,7 +821,7 @@ bool GDT::Network::Connection::connectionIsGood(uint32_t destinationAddress)
     return connectionDataIter->second.isGood;
 }
 
-void GDT::Network::Connection::reset(Connection::Mode mode, unsigned short serverPort, unsigned short clientPort, bool clientBroadcast)
+void GDT::NetworkConnection::reset(NetworkConnection::Mode mode, unsigned short serverPort, unsigned short clientPort, bool clientBroadcast)
 {
     this->mode = mode;
     this->serverPort = serverPort;
@@ -840,12 +840,12 @@ void GDT::Network::Connection::reset(Connection::Mode mode, unsigned short serve
     this->clientBroadcast = clientBroadcast;
 }
 
-void GDT::Network::Connection::setClientBroadcast(bool clientWillBroadcast)
+void GDT::NetworkConnection::setClientBroadcast(bool clientWillBroadcast)
 {
     clientBroadcast = clientWillBroadcast;
 }
 
-void GDT::Network::Connection::registerConnection(uint32_t address, uint32_t ID, unsigned short port)
+void GDT::NetworkConnection::registerConnection(uint32_t address, uint32_t ID, unsigned short port)
 {
     if(mode == SERVER)
     {
@@ -859,7 +859,7 @@ void GDT::Network::Connection::registerConnection(uint32_t address, uint32_t ID,
     connectionMade(address);
 }
 
-void GDT::Network::Connection::unregisterConnection(uint32_t address)
+void GDT::NetworkConnection::unregisterConnection(uint32_t address)
 {
     if(connectionData.erase(address) != 0)
     {
@@ -871,12 +871,12 @@ void GDT::Network::Connection::unregisterConnection(uint32_t address)
     }
 }
 
-void GDT::Network::Connection::shiftBitfield(uint32_t address, uint32_t diff)
+void GDT::NetworkConnection::shiftBitfield(uint32_t address, uint32_t diff)
 {
     connectionData.at(address).ackBitfield = (connectionData.at(address).ackBitfield >> diff) | (0x100000000 >> diff);
 }
 
-void GDT::Network::Connection::checkSentPackets(uint32_t ack, uint32_t bitfield, uint32_t address)
+void GDT::NetworkConnection::checkSentPackets(uint32_t ack, uint32_t bitfield, uint32_t address)
 {
     if(!resendTimedOutPackets)
         return;
@@ -919,7 +919,7 @@ void GDT::Network::Connection::checkSentPackets(uint32_t ack, uint32_t bitfield,
     }
 }
 
-void GDT::Network::Connection::lookupRtt(uint32_t address, uint32_t ack)
+void GDT::NetworkConnection::lookupRtt(uint32_t address, uint32_t ack)
 {
     for(auto iter = connectionData.at(address).sentPackets.begin(); iter != connectionData.at(address).sentPackets.end(); ++iter)
     {
@@ -943,7 +943,7 @@ void GDT::Network::Connection::lookupRtt(uint32_t address, uint32_t ack)
     }
 }
 
-void GDT::Network::Connection::checkSentPacketsSize(uint32_t address)
+void GDT::NetworkConnection::checkSentPacketsSize(uint32_t address)
 {
     while(connectionData.at(address).sentPackets.size() > GDT_INTERNAL_NETWORK_SENT_PACKET_LIST_MAX_SIZE)
     {
@@ -951,7 +951,7 @@ void GDT::Network::Connection::checkSentPacketsSize(uint32_t address)
     }
 }
 
-uint32_t GDT::Network::Connection::generateID()
+uint32_t GDT::NetworkConnection::generateID()
 {
     uint32_t id;
     do
@@ -962,7 +962,7 @@ uint32_t GDT::Network::Connection::generateID()
     return id;
 }
 
-void GDT::Network::Connection::preparePacket(std::vector<char>& packetData, uint32_t& sequenceID, uint32_t address, bool isPing)
+void GDT::NetworkConnection::preparePacket(std::vector<char>& packetData, uint32_t& sequenceID, uint32_t address, bool isPing)
 {
     assert(packetData.empty());
 
@@ -1009,12 +1009,12 @@ void GDT::Network::Connection::preparePacket(std::vector<char>& packetData, uint
     }
 }
 
-void GDT::Network::Connection::sendPacket(const std::vector<char>& data, uint32_t address, uint32_t resendingID)
+void GDT::NetworkConnection::sendPacket(const std::vector<char>& data, uint32_t address, uint32_t resendingID)
 {
     connectionData.at(address).sendPacketQueue.push_front(PacketInfo(data, std::chrono::steady_clock::time_point(), address, resendingID, true));
 }
 
-void GDT::Network::Connection::receivedPacket(const char* data, uint32_t count, uint32_t address, bool outOfOrder)
+void GDT::NetworkConnection::receivedPacket(const char* data, uint32_t count, uint32_t address, bool outOfOrder)
 {
     if(receivedCallback && count > 0)
     {
@@ -1022,7 +1022,7 @@ void GDT::Network::Connection::receivedPacket(const char* data, uint32_t count, 
     }
 }
 
-void GDT::Network::Connection::connectionMade(uint32_t address)
+void GDT::NetworkConnection::connectionMade(uint32_t address)
 {
     if(connectedCallback)
     {
@@ -1030,7 +1030,7 @@ void GDT::Network::Connection::connectionMade(uint32_t address)
     }
 }
 
-void GDT::Network::Connection::connectionLost(uint32_t address)
+void GDT::NetworkConnection::connectionLost(uint32_t address)
 {
     if(disconnectedCallback)
     {
@@ -1038,7 +1038,7 @@ void GDT::Network::Connection::connectionLost(uint32_t address)
     }
 }
 
-void GDT::Network::Connection::initialize()
+void GDT::NetworkConnection::initialize()
 {
     if(validState)
     {

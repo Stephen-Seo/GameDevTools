@@ -586,7 +586,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                 std::cout << "CLIENT: Establishing connection with server..." << std::endl;
 #endif
                 clientRetryTimer = 0.0f;
-                char data[20];
+                char data[21];
                 uint32_t temp = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
                 memcpy(data, &temp, 4);
                 temp = htonl(GDT::Internal::Network::CONNECT);
@@ -596,6 +596,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                 memcpy(data + 12, &temp, 4);
                 temp = 0xFFFFFFFF;
                 memcpy(data + 16, &temp, 4);
+                data[20] = 0;
 
                 // send data
                 sockaddr_in destinationInfo;
@@ -620,7 +621,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                 }
                 int sentBytes = sendto(socketHandle,
                     (const char*) data,
-                    20,
+                    21,
                     0,
                     (sockaddr*) &destinationInfo,
                     sizeof(sockaddr_in));

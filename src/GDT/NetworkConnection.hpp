@@ -130,6 +130,11 @@ public:
     /// Adds to the queue of to-send-packets the given packetData to the given
     /// destination IP address.
     void sendPacket(const std::vector<char>& packetData, uint32_t address);
+
+private:
+    void resendPacket(const std::vector<char>& packetData, uint32_t address);
+
+public:
     /// Adds to the queue of to-send-packets the given packetData to the given
     /// destination IP address.
     void sendPacket(const char* packetData, uint32_t packetSize, uint32_t address);
@@ -144,12 +149,14 @@ public:
     /// Sets the callback called when a valid packet is received.
     /**
         The callback will be called with the received data, the byte count of
-        the received data, the IP address of the sender as an uint32, and a
-        bool that is true when the packet was received out of order.
-        Note that if the packet did not have any data other than what was used
-        to manage the connection, then the callback will not be called.
+        the received data, the IP address of the sender as an uint32, a bool
+        that is true when the packet was received out of order, and a bool that
+        is true when the packet was resent because it was not initially
+        received (and timed out). Note that if the packet did not have any data
+        other than what was used to manage the connection, then the callback
+        will not be called.
     */
-    void setReceivedCallback(std::function<void(const char*, uint32_t, uint32_t, bool)> callback);
+    void setReceivedCallback(std::function<void(const char*, uint32_t, uint32_t, bool, bool)> callback);
 
     /// Sets the callback called when a connection to a peer is established.
     /**
@@ -243,7 +250,7 @@ private:
     uint32_t clientSentAddress;
     bool clientSentAddressSet;
 
-    std::function<void(const char*, uint32_t, uint32_t, bool)> receivedCallback;
+    std::function<void(const char*, uint32_t, uint32_t, bool, bool)> receivedCallback;
     std::function<void(uint32_t)> connectedCallback;
     std::function<void(uint32_t)> disconnectedCallback;
 
@@ -271,11 +278,11 @@ private:
 
     uint32_t generateID();
 
-    void preparePacket(std::vector<char>& packetData, uint32_t& sequenceID, uint32_t address, bool isPing = false);
+    void preparePacket(std::vector<char>& packetData, uint32_t& sequenceID, uint32_t address, bool isPing = false, bool isResending = false);
 
-    void sendPacket(const std::vector<char>& data, uint32_t address, uint32_t resendingID);
+//    void sendPacket(const std::vector<char>& data, uint32_t address, uint32_t resendingID);
 
-    void receivedPacket(const char* data, uint32_t count, uint32_t address, bool outOfOrder);
+    void receivedPacket(const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent);
 
     void connectionMade(uint32_t address);
 

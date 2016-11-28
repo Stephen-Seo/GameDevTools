@@ -3,6 +3,7 @@
 #include <string>
 #include <cstring>
 #include <cstdlib>
+#include <unordered_set>
 
 #include <GDT/GameLoop.hpp>
 #include <GDT/NetworkConnection.hpp>
@@ -137,10 +138,20 @@ int main(int argc, char** argv)
         connection.connectToServer(serverIP);
     }
 
-    float timer = 0;
+    std::unordered_set<uint32_t> connected;
 
-    auto update = [&connection, &timer] (float deltaTime) {
+    connection.setConnectedCallback([&connected] (uint32_t address) {
+        connected.insert(address);
+    });
+    connection.setDisconnectedCallback([&connected] (uint32_t address) {
+        connected.erase(address);
+    });
+
+//    float timer = 0;
+
+    auto update = [&connection, &connected] (float deltaTime) {
         connection.update(deltaTime);
+/*
         timer += deltaTime;
         if(timer >= 10.0f)
         {
@@ -148,19 +159,46 @@ int main(int argc, char** argv)
             char data[5] = "derp";
             connection.sendPacket(data, 5, connection.getConnected().front());
         }
+*/
+        char data[5] = "derp";
+        for(auto iter = connected.begin(); iter != connected.end(); ++iter)
+        {
+            if(connection.getPacketQueueSize(*iter) == 0)
+            {
+                connection.sendPacket(data, 5, *iter);
+            }
+        }
     };
     auto draw = [] () {};
 
     if(isServer)
     {
-        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder) {
-            std::cout << "Received extra as server" << std::endl;
+        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent) {
+            std::cout << "Received extra as server";
+            if(outOfOrder)
+            {
+                std::cout << " (Out of Order)";
+            }
+            if(isResent)
+            {
+                std::cout << " (Resent)";
+            }
+            std::cout << std::endl;
         });
     }
     else
     {
-        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder) {
-            std::cout << "Received extra as client" << std::endl;
+        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent) {
+            std::cout << "Received extra as client";
+            if(outOfOrder)
+            {
+                std::cout << " (Out of Order)";
+            }
+            if(isResent)
+            {
+                std::cout << " (Resent)";
+            }
+            std::cout << std::endl;
         });
     }
 

@@ -28,7 +28,7 @@ TEST(SceneNode, Transform)
 {
     // setup
     // root
-    SceneNode::Ptr rootPtr = std::make_unique<SNListener>();
+    SceneNode::Ptr rootPtr = SceneNode::Ptr(new SNListener());
     SNListener* root = static_cast<SNListener*>(rootPtr.get());
     root->applyTransform(glm::translate(glm::mat4(), glm::vec3(5.0f, 0.0f, 2.0f)));
     root->listener = [] (glm::mat4 worldTransform) {
@@ -38,7 +38,7 @@ TEST(SceneNode, Transform)
         floatEqual(transformed.z, 2.0f);
     };
     // child 1
-    SceneNode::Ptr c1Ptr = std::make_unique<SNListener>();
+    SceneNode::Ptr c1Ptr = SceneNode::Ptr(new SNListener());
     SNListener* c1 = static_cast<SNListener*>(c1Ptr.get());
     c1->applyTransform(glm::rotate(glm::mat4(), glm::acos(-1.0f) / 2.0f, glm::vec3(0.0f, 0.0f, 1.0f)));
     // root is now:
@@ -55,7 +55,7 @@ TEST(SceneNode, Transform)
     rootPtr->attachChild(std::move(c1Ptr));
 
     // child 2
-    SceneNode::Ptr c2Ptr = std::make_unique<SNListener>();
+    SceneNode::Ptr c2Ptr = SceneNode::Ptr(new SNListener());
     SNListener* c2 = static_cast<SNListener*>(c2Ptr.get());
     c2->applyTransform(glm::rotate(glm::mat4(), glm::acos(-1.0f) / 2.0f, glm::vec3(0.0f, 0.0f, 1.0f)));
     // c1 is now:

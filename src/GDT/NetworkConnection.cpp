@@ -625,7 +625,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                     0,
                     (sockaddr*) &destinationInfo,
                     sizeof(sockaddr_in));
-                if(sentBytes != 20)
+                if(sentBytes != 21)
                 {
                     std::cerr << "ERROR: Failed to send initiate connection packet to server!" << std::endl;
                 }

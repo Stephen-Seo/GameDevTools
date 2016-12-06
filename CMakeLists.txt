@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.0)
 
 project(GameDevTools)
 
+set(GameDevTools_VERSION_MAJOR 1)
+set(GameDevTools_VERSION_MINOR 0)
+set(GameDevTools_VERSION "${GameDevTools_VERSION_MAJOR}.${GameDevTools_VERSION_MINOR}")
+
 set(GameDevTools_SOURCES
     src/GDT/Internal/NetworkIdentifiers.cpp
     src/GDT/GameLoop.cpp
@@ -22,6 +26,12 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 add_library(GameDevTools ${GameDevTools_SOURCES})
+
+set_target_properties(GameDevTools
+    PROPERTIES
+    VERSION ${GameDevTools_VERSION}
+    SOVERSION ${GameDevTools_VERSION}
+)
 
 if(WIN32)
     target_link_libraries(GameDevTools ws2_32)
@@ -49,4 +59,14 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
     add_executable(NetworkingTest ${NetworkingTest_SOURCES})
     target_link_libraries(NetworkingTest GameDevTools)
 endif()
+
+install(TARGETS GameDevTools
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+)
+
+install(DIRECTORY src/GDT
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.hpp"
+)
 

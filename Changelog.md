@@ -1,7 +1,8 @@
 
 # Version 1.1
 
-Fixed bug where broadcasting client always failed to connect with server.
+Fixed bug in NetworkConnection where broadcasting client always failed to
+connect with server.
 
 # Version 1.0
 

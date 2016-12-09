@@ -6,7 +6,8 @@ namespace GDT
 {
     /// Returns true if the point (x,y) is within a convex polygon.
     /**
-        The shape of the polygon defined by arrayOfPairs must be convex.
+        The shape of the polygon defined by arrayOfPairs must be convex and
+        each point must be in clockwise or counterclockwise order.
         Otherwise, behavior is undefined.
         arrayOfPairs must be an array of at least size 3 of an array size 2.
         size must be the number of size-2-arrays within arrayOfPairs.
@@ -17,7 +18,8 @@ namespace GDT
 
     /// Returns true if the point (x,y) is within a convex polygon.
     /**
-        The shape of the polygon defined by arrayOfPairs must be convex.
+        The shape of the polygon defined by arrayOfPairs must be convex and
+        each point must be in clockwise or counterclockwise order.
         Otherwise, behavior is undefined.
         arrayOfPairs must be an array of at least size 6 and even.
         arraySize must be the size of arrayOfPairs.

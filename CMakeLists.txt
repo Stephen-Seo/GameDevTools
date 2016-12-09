@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 project(GameDevTools)
 
 set(GameDevTools_VERSION_MAJOR 1)
-set(GameDevTools_VERSION_MINOR 1)
+set(GameDevTools_VERSION_MINOR 2)
 set(GameDevTools_VERSION "${GameDevTools_VERSION_MAJOR}.${GameDevTools_VERSION_MINOR}")
 
 set(GameDevTools_SOURCES

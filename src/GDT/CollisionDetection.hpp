@@ -10,8 +10,8 @@ namespace GDT
         Otherwise, behavior is undefined.
         arrayOfPairs must be an array of at least size 3 of an array size 2.
         size must be the number of size-2-arrays within arrayOfPairs.
-        Thus if arrayOfPairs is defined as \code{.cpp} float arrayOfPairs[4][2]
-        \endcode , then size must be 4.
+        Thus if arrayOfPairs is defined as float arrayOfPairs[4][2], then size
+        must be 4.
     */
     bool isWithinPolygon(float (*arrayOfPairs)[2], unsigned int size, float x, float y);
 

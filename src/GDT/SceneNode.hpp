@@ -14,6 +14,8 @@
 #ifndef NDEBUG
   #include <iostream>
 #endif
+namespace GDT
+{
 
 class SceneNode
 {
@@ -163,6 +165,8 @@ private:
     glm::mat4 transform;
 
 };
+
+}
 
 #endif
 

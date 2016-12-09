@@ -6,6 +6,8 @@
 
 #include <GDT/SceneNode.hpp>
 
+using namespace GDT;
+
 void floatEqual(const float& given, const float& test)
 {
     EXPECT_GT(given, test - 0.1f);

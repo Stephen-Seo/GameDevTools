@@ -11,6 +11,7 @@ set(GameDevTools_SOURCES
     src/GDT/GameLoop.cpp
     src/GDT/NetworkConnection.cpp
     src/GDT/SceneNode.cpp
+    src/GDT/CollisionDetection.cpp
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -44,6 +45,7 @@ if(GTEST_FOUND)
         src/test/Main.cpp
         src/test/TestGameLoop.cpp
         src/test/TestSceneNode.cpp
+        src/test/TestCollisionDetection.cpp
     )
 
     add_executable(UnitTests ${UnitTests_SOURCES})

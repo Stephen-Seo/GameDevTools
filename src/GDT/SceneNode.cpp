@@ -1,27 +1,27 @@
 
 #include "SceneNode.hpp"
 
-SceneNode::SceneNode()
+GDT::SceneNode::SceneNode()
 {
     parent = nullptr;
 }
 
-SceneNode::~SceneNode()
+GDT::SceneNode::~SceneNode()
 {}
 
-void SceneNode::attachChild(SceneNode::Ptr child)
+void GDT::SceneNode::attachChild(GDT::SceneNode::Ptr child)
 {
     child->parent = this;
     attachRequests.push_back(std::move(child));
 }
 
-void SceneNode::attachChildFront(SceneNode::Ptr child)
+void GDT::SceneNode::attachChildFront(GDT::SceneNode::Ptr child)
 {
     child->parent = this;
     attachRequestsFront.push_back(std::move(child));
 }
 
-void SceneNode::attachToRoot(SceneNode::Ptr child)
+void GDT::SceneNode::attachToRoot(GDT::SceneNode::Ptr child)
 {
     if(parent != nullptr)
     {
@@ -34,7 +34,7 @@ void SceneNode::attachToRoot(SceneNode::Ptr child)
     }
 }
 
-void SceneNode::attachToRootFront(SceneNode::Ptr child)
+void GDT::SceneNode::attachToRootFront(GDT::SceneNode::Ptr child)
 {
     if(parent != nullptr)
     {
@@ -47,22 +47,22 @@ void SceneNode::attachToRootFront(SceneNode::Ptr child)
     }
 }
 
-void SceneNode::detachChild(SceneNode* node)
+void GDT::SceneNode::detachChild(SceneNode* node)
 {
     detachRequests.push_back(node);
 }
 
-void SceneNode::clear()
+void GDT::SceneNode::clear()
 {
     children.clear();
 }
 
-const glm::mat4& SceneNode::getTransform() const
+const glm::mat4& GDT::SceneNode::getTransform() const
 {
     return transform;
 }
 
-glm::mat4 SceneNode::getWorldTransform() const
+glm::mat4 GDT::SceneNode::getWorldTransform() const
 {
     if(parent != nullptr)
     {
@@ -74,17 +74,17 @@ glm::mat4 SceneNode::getWorldTransform() const
     }
 }
 
-void SceneNode::applyTransform(const glm::mat4& transform)
+void GDT::SceneNode::applyTransform(const glm::mat4& transform)
 {
     this->transform = transform * this->transform;
 }
 
-void SceneNode::resetTransform()
+void GDT::SceneNode::resetTransform()
 {
     transform = glm::mat4();
 }
 
-void SceneNode::update(float deltaTime)
+void GDT::SceneNode::update(float deltaTime)
 {
     updateCurrent(deltaTime);
     updateChildren(deltaTime);
@@ -93,12 +93,12 @@ void SceneNode::update(float deltaTime)
     detachChildren();
 }
 
-void SceneNode::forEach(std::function<void(SceneNode&)> function, bool includeThis, unsigned int maxDepth)
+void GDT::SceneNode::forEach(std::function<void(SceneNode&)> function, bool includeThis, unsigned int maxDepth)
 {
     forEach(function, includeThis, maxDepth, 0U);
 }
 
-void SceneNode::forEach(std::function<void(SceneNode&)> function, bool includeThis, unsigned int maxDepth, unsigned int currentDepth)
+void GDT::SceneNode::forEach(std::function<void(SceneNode&)> function, bool includeThis, unsigned int maxDepth, unsigned int currentDepth)
 {
     if(includeThis)
     {
@@ -114,12 +114,12 @@ void SceneNode::forEach(std::function<void(SceneNode&)> function, bool includeTh
     }
 }
 
-bool SceneNode::operator ==(const SceneNode& other) const
+bool GDT::SceneNode::operator ==(const SceneNode& other) const
 {
     return this == &other;
 }
 
-void SceneNode::detachSelf()
+void GDT::SceneNode::detachSelf()
 {
     if(parent != nullptr)
     {
@@ -127,38 +127,38 @@ void SceneNode::detachSelf()
     }
 }
 
-void SceneNode::draw() const
+void GDT::SceneNode::draw() const
 {
     drawCurrent(transform);
     drawChildren(transform);
 }
 
-void SceneNode::draw(glm::mat4 parentTransform) const
+void GDT::SceneNode::draw(glm::mat4 parentTransform) const
 {
     glm::mat4 worldTransform = transform * parentTransform;
     drawCurrent(worldTransform);
     drawChildren(worldTransform);
 }
 
-void SceneNode::drawCurrent(glm::mat4 worldTransform) const
+void GDT::SceneNode::drawCurrent(glm::mat4 worldTransform) const
 {}
 
-void SceneNode::drawChildren(glm::mat4 worldTransform) const
+void GDT::SceneNode::drawChildren(glm::mat4 worldTransform) const
 {
     std::for_each(children.begin(), children.end(),
-        [&worldTransform] (const SceneNode::Ptr& child) { child->draw(worldTransform); });
+        [&worldTransform] (const GDT::SceneNode::Ptr& child) { child->draw(worldTransform); });
 }
 
-void SceneNode::updateCurrent(float deltaTime)
+void GDT::SceneNode::updateCurrent(float deltaTime)
 {}
 
-void SceneNode::updateChildren(float deltaTime)
+void GDT::SceneNode::updateChildren(float deltaTime)
 {
     std::for_each(children.begin(), children.end(),
-        [&deltaTime] (SceneNode::Ptr& child) { child->update(deltaTime); });
+        [&deltaTime] (GDT::SceneNode::Ptr& child) { child->update(deltaTime); });
 }
 
-void SceneNode::attachChildren()
+void GDT::SceneNode::attachChildren()
 {
     while(!attachRequests.empty())
     {
@@ -172,12 +172,12 @@ void SceneNode::attachChildren()
     }
 }
 
-void SceneNode::detachChildren()
+void GDT::SceneNode::detachChildren()
 {
     while(!detachRequests.empty())
     {
         SceneNode* ptr = detachRequests.back();
-        auto found = std::find_if(children.begin(), children.end(), [&ptr] (const SceneNode::Ptr& pointer) {
+        auto found = std::find_if(children.begin(), children.end(), [&ptr] (const GDT::SceneNode::Ptr& pointer) {
             return pointer.get() == ptr;
         });
 

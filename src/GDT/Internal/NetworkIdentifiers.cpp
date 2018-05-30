@@ -25,12 +25,14 @@ GDT::Internal::Network::PacketInfo::PacketInfo(
     std::chrono::steady_clock::time_point sentTime,
     uint32_t address,
     uint32_t id,
-    bool isResending) :
+    bool isResending,
+    bool isNotReceivedChecked) :
 data(data),
 sentTime(sentTime),
 address(address),
 id(id),
-isResending(isResending)
+isResending(isResending),
+isNotReceivedChecked(isNotReceivedChecked)
 {}
 
 GDT::Internal::Network::ConnectionData::ConnectionData() :
@@ -75,10 +77,10 @@ bool GDT::Internal::Network::MoreRecent(uint32_t current, uint32_t previous)
             ((previous > current) && (previous - current > 0x7FFFFFFF)));
 }
 
-bool GDT::Internal::Network::IsSpecialID(uint32_t ID)
-{
-    return ID == CONNECT || ID == PING;
-}
+//bool GDT::Internal::Network::IsSpecialID(uint32_t ID)
+//{
+//    return ID == CONNECT || ID == PING;
+//}
 
 bool GDT::Internal::Network::InitializeSockets()
 {
@@ -199,7 +201,7 @@ uint32_t GDT::Internal::Network::getBroadcastAddress()
         {
             if(localIP == ntohl(sockaddrInfo->sin_addr.s_addr))
             {
-                if((ifaddrsInfo->ifa_flags | IFF_BROADCAST) != 0)
+                if((ifaddrsInfo->ifa_flags & IFF_BROADCAST) != 0)
                 {
                     sockaddr_in* broadcastInfo = (sockaddr_in*)(ifaddrsInfo->ifa_ifu.ifu_broadaddr);
                     if(broadcastInfo != nullptr)

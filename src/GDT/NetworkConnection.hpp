@@ -7,8 +7,8 @@
 #include <unordered_map>
 #include <cassert>
 #include <functional>
-#include <list>
 #include <random>
+#include <memory>
 
 #include <iostream>
 
@@ -129,7 +129,11 @@ public:
 
     /// Adds to the queue of to-send-packets the given packetData to the given
     /// destination IP address.
-    void sendPacket(const std::vector<char>& packetData, uint32_t address);
+    /**
+        \param isReceivedChecked If set to true, this packet will be checked
+            and will be resent if it has been dropped.
+    */
+    void sendPacket(const std::vector<char>& packetData, uint32_t address, bool isReceivedChecked);
 
 private:
     void resendPacket(const std::vector<char>& packetData, uint32_t address);
@@ -137,26 +141,45 @@ private:
 public:
     /// Adds to the queue of to-send-packets the given packetData to the given
     /// destination IP address.
-    void sendPacket(const char* packetData, uint32_t packetSize, uint32_t address);
+    /**
+        \param isReceivedChecked If set to true, this packet will be checked
+            and will be resent if it has been dropped.
+    */
+    void sendPacket(const char* packetData, uint32_t packetSize, uint32_t address, bool isReceivedChecked);
 
     /// Gets the calculated round-trip-time to an arbritrary connected peer.
-    /** \return 0 if there are no connected peers. */
+    /**
+        Note that if most of the packets sent are not "isReceivedChecked" or no
+        packets were added to the queue for a while, then the RTT calculation
+        will be much slower than usual. This is due to the fact that RTT
+        calculation is based on checked packets.
+
+        \return 0 if there are no connected peers.
+    */
     float getRtt();
     /// Gets the calculated round-trip-time to the specified connected peer.
-    /** \return 0 if the specified peer is not connected (not found). */
+    /**
+        Note that if most of the packets sent are not "isReceivedChecked" or no
+        packets were added to the queue for a while, then the RTT calculation
+        will be much slower than usual. This is due to the fact that RTT
+        calculation is based on checked packets.
+
+        \return 0 if the specified peer is not connected (not found).
+    */
     float getRtt(uint32_t address);
 
     /// Sets the callback called when a valid packet is received.
     /**
         The callback will be called with the received data, the byte count of
         the received data, the IP address of the sender as an uint32, a bool
-        that is true when the packet was received out of order, and a bool that
+        that is true when the packet was received out of order, a bool that
         is true when the packet was resent because it was not initially
-        received (and timed out). Note that if the packet did not have any data
-        other than what was used to manage the connection, then the callback
-        will not be called.
+        received (and timed out), and a bool that is true if the packet received
+        is checked (sendPacket with "isReceivedChecked" is true). Note that
+        if the packet did not have any data other than what was used to manage
+        the connection, then the callback will not be called.
     */
-    void setReceivedCallback(std::function<void(const char*, uint32_t, uint32_t, bool, bool)> callback);
+    void setReceivedCallback(std::function<void(const char*, uint32_t, uint32_t, bool, bool, bool)> callback);
 
     /// Sets the callback called when a connection to a peer is established.
     /**
@@ -174,9 +197,9 @@ public:
     */
     void setDisconnectedCallback(std::function<void(uint32_t)> callback);
 
-    /// Gets a list of IP addresses of all connected peers.
+    /// Gets a vector of IP addresses of all connected peers.
     /** Note that the IP addresses is in an uint32 format. */
-    std::list<uint32_t> getConnected();
+    std::vector<uint32_t> getConnected();
 
     /// Gets the size of the packet queue for the specified destination address.
     unsigned int getPacketQueueSize(uint32_t destinationAddress);
@@ -250,7 +273,7 @@ private:
     uint32_t clientSentAddress;
     bool clientSentAddressSet;
 
-    std::function<void(const char*, uint32_t, uint32_t, bool, bool)> receivedCallback;
+    std::function<void(const char*, uint32_t, uint32_t, bool, bool, bool)> receivedCallback;
     std::function<void(uint32_t)> connectedCallback;
     std::function<void(uint32_t)> disconnectedCallback;
 
@@ -278,11 +301,9 @@ private:
 
     uint32_t generateID();
 
-    void preparePacket(std::vector<char>& packetData, uint32_t& sequenceID, uint32_t address, bool isPing = false, bool isResending = false);
+    void preparePacket(std::vector<char>& packetData, uint32_t& sequenceID, uint32_t address, bool isPing, bool isResending, bool noIncrementSequence);
 
-//    void sendPacket(const std::vector<char>& data, uint32_t address, uint32_t resendingID);
-
-    void receivedPacket(const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent);
+    void receivedPacket(const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent, bool isNoIncSeq);
 
     void connectionMade(uint32_t address);
 

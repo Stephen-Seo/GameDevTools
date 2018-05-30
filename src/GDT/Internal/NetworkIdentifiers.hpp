@@ -9,11 +9,11 @@
 #endif
 #define GDT_INTERNAL_NETWORK_SERVER_PORT 12084
 #define GDT_INTERNAL_NETWORK_PACKET_LOST_TIMEOUT_MILLISECONDS 1000
-#define GDT_INTERNAL_NETWORK_SENT_PACKET_LIST_MAX_SIZE 33
+#define GDT_INTERNAL_NETWORK_SENT_PACKET_LIST_MAX_SIZE 34
 #define GDT_INTERNAL_NETWORK_CONNECTION_TIMEOUT_MILLISECONDS 10000
 #define GDT_INTERNAL_NETWORK_CLIENT_RETRY_TIME_SECONDS 5.0f
 #define GDT_INTERNAL_NETWORK_GOOD_RTT_LIMIT_MILLISECONDS 250
-#define GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE 2048
+#define GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE 8192
 
 #define GDT_INTERNAL_NETWORK_GOOD_MODE_SEND_INTERVAL 1.0f/30.0f
 #define GDT_INTERNAL_NETWORK_BAD_MODE_SEND_INTERVAL 1.0f/10.0f
@@ -54,13 +54,15 @@ struct PacketInfo
             std::chrono::steady_clock::time_point(),
         uint32_t address = 0,
         uint32_t id = 0,
-        bool isResending = false);
+        bool isResending = false,
+        bool isNotReceivedChecked = false);
 
     std::vector<char> data;
     std::chrono::steady_clock::time_point sentTime;
     uint32_t address;
     uint32_t id;
     bool isResending;
+    bool isNotReceivedChecked;
 };
 
 struct ConnectionData
@@ -90,12 +92,14 @@ struct ConnectionData
 
 enum SpecialIDs
 {
-    CONNECT = 0xFFFFFFFF,
-    PING = 0xFFFFFFFE
+    CONNECT =       0x80000000,
+    PING =          0x40000000,
+    NO_REC_CHK =    0x20000000,
+    RESENDING =     0x10000000
 };
 
 bool MoreRecent(uint32_t current, uint32_t previous);
-bool IsSpecialID(uint32_t ID);
+//bool IsSpecialID(uint32_t ID);
 
 bool InitializeSockets();
 void CleanupSockets();

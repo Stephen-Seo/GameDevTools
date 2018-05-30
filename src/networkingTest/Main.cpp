@@ -147,25 +147,31 @@ int main(int argc, char** argv)
         connected.erase(address);
     });
 
-//    float timer = 0;
+    float timer;
+    if(isServer)
+    {
+        timer = -1.0f;
+    }
+    else
+    {
+        timer = 0.0f;
+    }
+    const float time = 0.5f;
 
-    auto update = [&connection, &connected] (float deltaTime) {
-        connection.update(deltaTime);
-/*
+    auto update = [&connection, &connected, &timer, &time] (float deltaTime) {
         timer += deltaTime;
-        if(timer >= 10.0f)
+        connection.update(deltaTime);
+
+        if(timer >= time)
         {
-            timer -= 10.0f;
+            timer = 0.0f;
             char data[5] = "derp";
-            connection.sendPacket(data, 5, connection.getConnected().front());
-        }
-*/
-        char data[5] = "derp";
-        for(auto iter = connected.begin(); iter != connected.end(); ++iter)
-        {
-            if(connection.getPacketQueueSize(*iter) == 0)
+            for(auto iter = connected.begin(); iter != connected.end(); ++iter)
             {
-                connection.sendPacket(data, 5, *iter);
+                if(connection.getPacketQueueSize(*iter) == 0)
+                {
+                    connection.sendPacket(data, 5, *iter, true);
+                }
             }
         }
     };
@@ -173,8 +179,9 @@ int main(int argc, char** argv)
 
     if(isServer)
     {
-        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent) {
-            std::cout << "Received extra as server";
+        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent, bool isReceivedChecked) {
+            std::cout << "Received extra as server" << (isReceivedChecked ?
+                "" : " (not received checked)");
             if(outOfOrder)
             {
                 std::cout << " (Out of Order)";
@@ -188,8 +195,9 @@ int main(int argc, char** argv)
     }
     else
     {
-        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent) {
-            std::cout << "Received extra as client";
+        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent, bool isReceivedChecked) {
+            std::cout << "Received extra as client" << (isReceivedChecked ?
+                "" : " (not received checked)");
             if(outOfOrder)
             {
                 std::cout << " (Out of Order)";

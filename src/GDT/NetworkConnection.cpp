@@ -165,7 +165,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                     std::vector<char> data;
                     uint32_t sequenceID;
 
-                    preparePacket(data, sequenceID, iter->first, false, pInfo.isResending);
+                    preparePacket(data, sequenceID, iter->first, false, pInfo.isResending, pInfo.isNotReceivedChecked);
                     // append packetInfo's data to prepared data
                     data.insert(data.end(), pInfo.data.begin(), pInfo.data.end());
 
@@ -187,10 +187,17 @@ void GDT::NetworkConnection::update(float deltaTime)
                     }
                     else
                     {
-                        // store current packet info in sentPackets
-                        iter->second.sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), iter->first, sequenceID));
-
-                        checkSentPacketsSize(iter->first);
+                        if(!pInfo.isNotReceivedChecked)
+                        {
+                            // store current packet info in sentPackets
+                            iter->second.sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), iter->first, sequenceID));
+                            checkSentPacketsSize(iter->first);
+                        }
+                        else
+                        {
+                            iter->second.sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), iter->first, sequenceID, false, true));
+                            checkSentPacketsSize(iter->first);
+                        }
                     }
                 }
                 else
@@ -199,7 +206,7 @@ void GDT::NetworkConnection::update(float deltaTime)
 
                     std::vector<char> data;
                     uint32_t sequenceID;
-                    preparePacket(data, sequenceID, iter->first);
+                    preparePacket(data, sequenceID, iter->first, false, false, true);
 
                     sockaddr_in destinationInfo;
                     destinationInfo.sin_family = AF_INET;
@@ -218,9 +225,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                     }
                     else
                     {
-                        // store current packet info in sentPackets
-                        iter->second.sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), iter->first, sequenceID));
-
+                        iter->second.sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), iter->first, sequenceID, false, true));
                         checkSentPacketsSize(iter->first);
                     }
                 }
@@ -242,7 +247,7 @@ void GDT::NetworkConnection::update(float deltaTime)
             (sockaddr*) &receivedData,
             &receivedDataSize);
 
-        if(bytes >= 21)
+        if(bytes >= 20)
         {
             uint32_t address = ntohl(receivedData.sin_addr.s_addr);
             uint16_t port = ntohs(receivedData.sin_port);
@@ -262,9 +267,15 @@ void GDT::NetworkConnection::update(float deltaTime)
             uint32_t ack = ntohl(*tempPtr);
             tempPtr = (uint32_t*)(data.data() + 16);
             uint32_t ackBitfield = ntohl(*tempPtr);
-            bool isResent = data[20] != 0x0;
 
-            if(ID == GDT::Internal::Network::CONNECT && acceptNewConnections)
+            bool isConnect = (ID & GDT::Internal::Network::CONNECT) != 0;
+            bool isPing = (ID & GDT::Internal::Network::PING) != 0;
+            bool isNotReceivedChecked = (ID & GDT::Internal::Network::NO_REC_CHK) != 0;
+            bool isResent = (ID & GDT::Internal::Network::RESENDING) != 0;
+
+            ID = ID & 0x0FFFFFFF;
+
+            if(isConnect && acceptNewConnections)
             {
                 if(connectionData.find(address) == connectionData.end())
                 {
@@ -277,7 +288,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                 }
                 return;
             }
-            else if(ID == GDT::Internal::Network::PING)
+            else if(isPing)
             {
                 connectionData.at(address).triggerSend = true;
             }
@@ -365,7 +376,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                 return;
             }
 
-            receivedPacket(data.data() + 21, bytes - 21, address, outOfOrder, isResent);
+            receivedPacket(data.data() + 20, bytes - 20, address, outOfOrder, isResent, isNotReceivedChecked);
         }
     } // if(mode == SERVER)
     else if(mode == CLIENT)
@@ -398,7 +409,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                     std::vector<char> data;
                     uint32_t sequenceID;
 
-                    preparePacket(data, sequenceID, serverAddress, false, pInfo.isResending);
+                    preparePacket(data, sequenceID, serverAddress, false, pInfo.isResending, pInfo.isNotReceivedChecked);
 
                     data.insert(data.end(), pInfo.data.begin(), pInfo.data.end());
 
@@ -420,8 +431,16 @@ void GDT::NetworkConnection::update(float deltaTime)
                     }
                     else
                     {
-                        connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), serverAddress, sequenceID));
-                        checkSentPacketsSize(serverAddress);
+                        if(!pInfo.isNotReceivedChecked)
+                        {
+                            connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), serverAddress, sequenceID));
+                            checkSentPacketsSize(serverAddress);
+                        }
+                        else
+                        {
+                            connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), serverAddress, sequenceID, false, true));
+                            checkSentPacketsSize(serverAddress);
+                        }
                     }
                 }
                 else
@@ -430,7 +449,7 @@ void GDT::NetworkConnection::update(float deltaTime)
 
                     std::vector<char> data;
                     uint32_t sequenceID;
-                    preparePacket(data, sequenceID, serverAddress);
+                    preparePacket(data, sequenceID, serverAddress, false, false, true);
 
                     // send data
                     sockaddr_in destinationInfo;
@@ -450,7 +469,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                     }
                     else
                     {
-                        connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), serverAddress, sequenceID));
+                        connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), serverAddress, sequenceID, false, true));
                         checkSentPacketsSize(serverAddress);
                     }
                 }
@@ -474,7 +493,7 @@ void GDT::NetworkConnection::update(float deltaTime)
             uint32_t address = ntohl(receivedData.sin_addr.s_addr);
             uint16_t port = ntohs(receivedData.sin_port);
 
-            if(bytes >= 21 && address == serverAddress && port == serverPort)
+            if(bytes >= 20 && address == serverAddress && port == serverPort)
             {
                 uint32_t* tempPtr = (uint32_t*)data.data();
                 uint32_t protocolID = ntohl(*tempPtr);
@@ -490,13 +509,20 @@ void GDT::NetworkConnection::update(float deltaTime)
                 uint32_t ack = ntohl(*tempPtr);
                 tempPtr = (uint32_t*)(data.data() + 16);
                 uint32_t bitfield = ntohl(*tempPtr);
-                bool isResent = data[20] != 0x0;
 
-                if(ID == GDT::Internal::Network::PING)
+                bool isConnect = (ID & GDT::Internal::Network::CONNECT) != 0;
+                bool isPing = (ID & GDT::Internal::Network::PING) != 0;
+                bool isNotReceivedChecked = (ID & GDT::Internal::Network::NO_REC_CHK) != 0;
+                bool isResent = (ID & GDT::Internal::Network::RESENDING) != 0;
+
+                ID = ID & 0x0FFFFFFF;
+
+                if(isPing)
                 {
                     connectionData.at(serverAddress).triggerSend = true;
                 }
-                else if(ID != connectionData.at(serverAddress).id)
+                else if(ID != connectionData.at(serverAddress).id
+                        || isConnect)
                     return;
 
                 // packet is valid
@@ -572,7 +598,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                     return;
                 }
 
-                receivedPacket(data.data() + 21, bytes - 21, serverAddress, outOfOrder, isResent);
+                receivedPacket(data.data() + 20, bytes - 20, serverAddress, outOfOrder, isResent, isNotReceivedChecked);
             }
         }
         // connection not yet established
@@ -586,7 +612,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                 std::cout << "CLIENT: Establishing connection with server..." << std::endl;
 #endif
                 clientRetryTimer = 0.0f;
-                char data[21];
+                char data[20];
                 uint32_t temp = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
                 memcpy(data, &temp, 4);
                 temp = htonl(GDT::Internal::Network::CONNECT);
@@ -596,7 +622,6 @@ void GDT::NetworkConnection::update(float deltaTime)
                 memcpy(data + 12, &temp, 4);
                 temp = 0xFFFFFFFF;
                 memcpy(data + 16, &temp, 4);
-                data[20] = 0;
 
                 // send data
                 sockaddr_in destinationInfo;
@@ -621,11 +646,11 @@ void GDT::NetworkConnection::update(float deltaTime)
                 }
                 int sentBytes = sendto(socketHandle,
                     (const char*) data,
-                    21,
+                    20,
                     0,
                     (sockaddr*) &destinationInfo,
                     sizeof(sockaddr_in));
-                if(sentBytes != 21)
+                if(sentBytes != 20)
                 {
                     std::cerr << "ERROR: Failed to send initiate connection packet to server!" << std::endl;
                 }
@@ -649,7 +674,7 @@ void GDT::NetworkConnection::update(float deltaTime)
             uint32_t address = ntohl(receivedData.sin_addr.s_addr);
             uint16_t port = ntohs(receivedData.sin_port);
 
-            if(bytes >= 21 && port == serverPort)
+            if(bytes >= 20 && port == serverPort)
             {
 #ifndef NDEBUG
                 std::cout << "." << std::flush;
@@ -661,7 +686,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                     return;
 
                 tempPtr = (uint32_t*)(data.data() + 4);
-                uint32_t ID = ntohl(*tempPtr);
+                uint32_t ID = ntohl(*tempPtr) & 0x0FFFFFFF;
 //                tempPtr = (uint32_t*)(data.data() + 8);
 //                uint32_t sequence = ntohl(*tempPtr);
 //                tempPtr = (uint32_t*)(data.data() + 12);
@@ -702,7 +727,7 @@ void GDT::NetworkConnection::connectToServer(uint32_t address)
     clientSentAddressSet = true;
 }
 
-void GDT::NetworkConnection::sendPacket(const std::vector<char>& packetData, uint32_t address)
+void GDT::NetworkConnection::sendPacket(const std::vector<char>& packetData, uint32_t address, bool isReceivedChecked)
 {
     if(connectionData.find(address) == connectionData.end())
     {
@@ -713,7 +738,7 @@ void GDT::NetworkConnection::sendPacket(const std::vector<char>& packetData, uin
         connectionData.at(address).sendPacketQueue.push_front(PacketInfo(
             packetData,
             std::chrono::steady_clock::time_point(),
-            address));
+            address, 0, false, !isReceivedChecked));
     }
 }
 
@@ -734,10 +759,10 @@ void GDT::NetworkConnection::resendPacket(const std::vector<char>& packetData, u
     }
 }
 
-void GDT::NetworkConnection::sendPacket(const char* packetData, uint32_t packetSize, uint32_t address)
+void GDT::NetworkConnection::sendPacket(const char* packetData, uint32_t packetSize, uint32_t address, bool isReceivedChecked)
 {
     std::vector<char> data(packetData, packetData + packetSize);
-    sendPacket(data, address);
+    sendPacket(data, address, isReceivedChecked);
 }
 
 float GDT::NetworkConnection::getRtt()
@@ -758,7 +783,7 @@ float GDT::NetworkConnection::getRtt(uint32_t address)
     return connectionData.at(address).rtt.count() / 1000.0f;
 }
 
-void GDT::NetworkConnection::setReceivedCallback(std::function<void(const char*, uint32_t, uint32_t, bool, bool)> callback)
+void GDT::NetworkConnection::setReceivedCallback(std::function<void(const char*, uint32_t, uint32_t, bool, bool, bool)> callback)
 {
     receivedCallback = callback;
 }
@@ -773,9 +798,9 @@ void GDT::NetworkConnection::setDisconnectedCallback(std::function<void(uint32_t
     disconnectedCallback = callback;
 }
 
-std::list<uint32_t> GDT::NetworkConnection::getConnected()
+std::vector<uint32_t> GDT::NetworkConnection::getConnected()
 {
-    std::list<uint32_t> connectedList;
+    std::vector<uint32_t> connectedList;
 
     for(auto iter = connectionData.begin(); iter != connectionData.end(); ++iter)
     {
@@ -904,6 +929,11 @@ void GDT::NetworkConnection::checkSentPackets(uint32_t ack, uint32_t bitfield, u
         {
             if(iter->id == ack)
             {
+                if(iter->isNotReceivedChecked)
+                {
+                    // skip packets that intentionally are not checked
+                    break;
+                }
                 // timed out, adding to send queue
                 auto duration = std::chrono::steady_clock::now() - iter->sentTime;
                 if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() >= GDT_INTERNAL_NETWORK_PACKET_LOST_TIMEOUT_MILLISECONDS)
@@ -913,7 +943,7 @@ void GDT::NetworkConnection::checkSentPackets(uint32_t ack, uint32_t bitfield, u
                     std::cout << ") timed out\n";
 #endif
                     std::vector<char> data = iter->data;
-                    data.erase(data.begin(), data.begin() + 21);
+                    data.erase(data.begin(), data.begin() + 20);
                     resendPacket(data, address);
                     iter->sentTime = std::chrono::steady_clock::now();
                 }
@@ -941,7 +971,7 @@ void GDT::NetworkConnection::lookupRtt(uint32_t address, uint32_t ack)
                 connectionData.at(address).rtt -= (connectionData.at(address).rtt - std::chrono::duration_cast<std::chrono::milliseconds>(duration)) / 10;
             }
 #ifndef NDEBUG
-            std::cout << "RTT of " << GDT::Internal::Network::addressToString(address) << " = " << connectionData.at(address).rtt.count() << '\n';
+            std::cout << "(" << ack << ") RTT of " << GDT::Internal::Network::addressToString(address) << " = " << connectionData.at(address).rtt.count() << '\n';
 #endif
             connectionData.at(address).isGoodRtt = connectionData.at(address).rtt.count() <= GDT_INTERNAL_NETWORK_GOOD_RTT_LIMIT_MILLISECONDS;
             break;
@@ -962,13 +992,17 @@ uint32_t GDT::NetworkConnection::generateID()
     uint32_t id;
     do
     {
-        id = dist(rd);
-    } while (GDT::Internal::Network::IsSpecialID(id));
+        id = dist(rd)
+            & ~(GDT::Internal::Network::CONNECT
+                | GDT::Internal::Network::PING
+                | GDT::Internal::Network::NO_REC_CHK
+                | GDT::Internal::Network::RESENDING);
+    } while (connectionData.find(id) != connectionData.end());
 
     return id;
 }
 
-void GDT::NetworkConnection::preparePacket(std::vector<char>& packetData, uint32_t& sequenceID, uint32_t address, bool isPing, bool isResending)
+void GDT::NetworkConnection::preparePacket(std::vector<char>& packetData, uint32_t& sequenceID, uint32_t address, bool isPing, bool isResending, bool isNotCheckReceivedPkt)
 {
     assert(packetData.empty());
 
@@ -983,12 +1017,12 @@ void GDT::NetworkConnection::preparePacket(std::vector<char>& packetData, uint32
 
     uint32_t ackBitfield = iter->second.ackBitfield;
 
-    char data[21];
-    if(isPing)
+    char data[20];
+    if(isNotCheckReceivedPkt)
     {
         uint32_t tempValue = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
         std::memcpy(data, &tempValue, 4);
-        tempValue = htonl(GDT::Internal::Network::PING);
+        tempValue = htonl(id | GDT::Internal::Network::NO_REC_CHK);
         std::memcpy(data + 4, &tempValue, 4);
         tempValue = htonl(sequenceID);
         std::memcpy(data + 8, &tempValue, 4);
@@ -996,37 +1030,45 @@ void GDT::NetworkConnection::preparePacket(std::vector<char>& packetData, uint32
         std::memcpy(data + 12, &tempValue, 4);
         tempValue = htonl(ackBitfield);
         std::memcpy(data + 16, &tempValue, 4);
-        data[20] = 0x0;
     }
     else
     {
-        uint32_t tempValue = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
-        std::memcpy(data, &tempValue, 4);
-        tempValue = htonl(id);
-        std::memcpy(data + 4, &tempValue, 4);
-        tempValue = htonl(sequenceID);
-        std::memcpy(data + 8, &tempValue, 4);
-        tempValue = htonl(ack);
-        std::memcpy(data + 12, &tempValue, 4);
-        tempValue = htonl(ackBitfield);
-        std::memcpy(data + 16, &tempValue, 4);
-        data[20] = (isResending ? 0xFF : 0x0);
+        if(isPing)
+        {
+            uint32_t tempValue = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
+            std::memcpy(data, &tempValue, 4);
+            tempValue = htonl(id | GDT::Internal::Network::PING);
+            std::memcpy(data + 4, &tempValue, 4);
+            tempValue = htonl(sequenceID);
+            std::memcpy(data + 8, &tempValue, 4);
+            tempValue = htonl(ack);
+            std::memcpy(data + 12, &tempValue, 4);
+            tempValue = htonl(ackBitfield);
+            std::memcpy(data + 16, &tempValue, 4);
+        }
+        else
+        {
+            uint32_t tempValue = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
+            std::memcpy(data, &tempValue, 4);
+            tempValue = htonl(id
+                | (isResending ? GDT::Internal::Network::RESENDING : 0));
+            std::memcpy(data + 4, &tempValue, 4);
+            tempValue = htonl(sequenceID);
+            std::memcpy(data + 8, &tempValue, 4);
+            tempValue = htonl(ack);
+            std::memcpy(data + 12, &tempValue, 4);
+            tempValue = htonl(ackBitfield);
+            std::memcpy(data + 16, &tempValue, 4);
+        }
     }
-    packetData.insert(packetData.end(), data, data + 21);
+    packetData.insert(packetData.end(), data, data + 20);
 }
 
-/*
-void GDT::NetworkConnection::sendPacket(const std::vector<char>& data, uint32_t address, uint32_t resendingID)
-{
-    connectionData.at(address).sendPacketQueue.push_front(PacketInfo(data, std::chrono::steady_clock::time_point(), address, resendingID, true));
-}
-*/
-
-void GDT::NetworkConnection::receivedPacket(const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent)
+void GDT::NetworkConnection::receivedPacket(const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent, bool isNoIncSeq)
 {
     if(receivedCallback && count > 0)
     {
-        receivedCallback(data, count, address, outOfOrder, isResent);
+        receivedCallback(data, count, address, outOfOrder, isResent, !isNoIncSeq);
     }
 }
 

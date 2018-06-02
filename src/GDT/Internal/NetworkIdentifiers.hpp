@@ -63,6 +63,7 @@ struct PacketInfo
     uint32_t id;
     bool isResending;
     bool isNotReceivedChecked;
+    bool hasBeenReSent;
 };
 
 struct ConnectionData

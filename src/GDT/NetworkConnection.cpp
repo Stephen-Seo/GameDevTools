@@ -929,9 +929,10 @@ void GDT::NetworkConnection::checkSentPackets(uint32_t ack, uint32_t bitfield, u
         {
             if(iter->id == ack)
             {
-                if(iter->isNotReceivedChecked)
+                if(iter->isNotReceivedChecked || iter->hasBeenReSent)
                 {
-                    // skip packets that intentionally are not checked
+                    // skip packets that intentionally are not checked or have
+                    // already been re-sent
                     break;
                 }
                 // timed out, adding to send queue
@@ -945,7 +946,7 @@ void GDT::NetworkConnection::checkSentPackets(uint32_t ack, uint32_t bitfield, u
                     std::vector<char> data = iter->data;
                     data.erase(data.begin(), data.begin() + 20);
                     resendPacket(data, address);
-                    iter->sentTime = std::chrono::steady_clock::now();
+                    iter->hasBeenReSent = true;
                 }
                 break;
             }

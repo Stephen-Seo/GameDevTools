@@ -32,7 +32,8 @@ sentTime(sentTime),
 address(address),
 id(id),
 isResending(isResending),
-isNotReceivedChecked(isNotReceivedChecked)
+isNotReceivedChecked(isNotReceivedChecked),
+hasBeenReSent(false)
 {}
 
 GDT::Internal::Network::ConnectionData::ConnectionData() :

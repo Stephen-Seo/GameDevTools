@@ -93,6 +93,7 @@ struct ConnectionData
 
 enum SpecialIDs
 {
+    NONE =          0,
     CONNECT =       0x80000000,
     PING =          0x40000000,
     NO_REC_CHK =    0x20000000,

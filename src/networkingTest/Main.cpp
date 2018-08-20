@@ -179,7 +179,7 @@ int main(int argc, char** argv)
 
     if(isServer)
     {
-        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent, bool isReceivedChecked) {
+        connection.setReceivedCallback([] (const char* /*data*/, uint32_t /*count*/, uint32_t /*address*/, bool outOfOrder, bool isResent, bool isReceivedChecked) {
             std::cout << "Received extra as server" << (isReceivedChecked ?
                 "" : " (not received checked)");
             if(outOfOrder)
@@ -195,7 +195,7 @@ int main(int argc, char** argv)
     }
     else
     {
-        connection.setReceivedCallback([] (const char* data, uint32_t count, uint32_t address, bool outOfOrder, bool isResent, bool isReceivedChecked) {
+        connection.setReceivedCallback([] (const char* /*data*/, uint32_t /*count*/, uint32_t /*address*/, bool outOfOrder, bool isResent, bool isReceivedChecked) {
             std::cout << "Received extra as client" << (isReceivedChecked ?
                 "" : " (not received checked)");
             if(outOfOrder)

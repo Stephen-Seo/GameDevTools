@@ -174,29 +174,37 @@ void GDT::NetworkConnection::update(float deltaTime)
                     destinationInfo.sin_family = AF_INET;
                     destinationInfo.sin_addr.s_addr = htonl(iter->first);
                     destinationInfo.sin_port = htons(iter->second.port);
-                    int sentBytes = sendto(socketHandle,
+                    long int sentBytes = sendto(socketHandle,
                         (const char*) data.data(),
                         data.size(),
                         0,
                         (sockaddr*) &destinationInfo,
                         sizeof(sockaddr_in));
 
-                    if(sentBytes != data.size())
+                    if(sentBytes < 0)
                     {
                         std::cerr << "Failed to send packet to client!" << std::endl;
                     }
                     else
                     {
-                        if(!pInfo.isNotReceivedChecked)
+                        unsigned long int u_sentBytes = sentBytes;
+                        if(u_sentBytes != data.size())
                         {
-                            // store current packet info in sentPackets
-                            iter->second.sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), iter->first, sequenceID));
-                            checkSentPacketsSize(iter->first);
+                            std::cerr << "Failed to send packet to client!" << std::endl;
                         }
                         else
                         {
-                            iter->second.sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), iter->first, sequenceID, false, true));
-                            checkSentPacketsSize(iter->first);
+                            if(!pInfo.isNotReceivedChecked)
+                            {
+                                // store current packet info in sentPackets
+                                iter->second.sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), iter->first, sequenceID));
+                                checkSentPacketsSize(iter->first);
+                            }
+                            else
+                            {
+                                iter->second.sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), iter->first, sequenceID, false, true));
+                                checkSentPacketsSize(iter->first);
+                            }
                         }
                     }
                 }
@@ -212,21 +220,29 @@ void GDT::NetworkConnection::update(float deltaTime)
                     destinationInfo.sin_family = AF_INET;
                     destinationInfo.sin_addr.s_addr = htonl(iter->first);
                     destinationInfo.sin_port = htons(iter->second.port);
-                    int sentBytes = sendto(socketHandle,
+                    long int sentBytes = sendto(socketHandle,
                         (const char*) data.data(),
                         data.size(),
                         0,
                         (sockaddr*) &destinationInfo,
                         sizeof(sockaddr_in));
 
-                    if(sentBytes != data.size())
+                    if(sentBytes < 0)
                     {
                         std::cerr << "Failed to send heartbeat packet to client!" << std::endl;
                     }
                     else
                     {
-                        iter->second.sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), iter->first, sequenceID, false, true));
-                        checkSentPacketsSize(iter->first);
+                        unsigned long int u_sentBytes = sentBytes;
+                        if(u_sentBytes != data.size())
+                        {
+                            std::cerr << "Failed to send heartbeat packet to client!" << std::endl;
+                        }
+                        else
+                        {
+                            iter->second.sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), iter->first, sequenceID, false, true));
+                            checkSentPacketsSize(iter->first);
+                        }
                     }
                 }
             }
@@ -418,28 +434,36 @@ void GDT::NetworkConnection::update(float deltaTime)
                     destinationInfo.sin_family = AF_INET;
                     destinationInfo.sin_addr.s_addr = htonl(serverAddress);
                     destinationInfo.sin_port = htons(serverPort);
-                    int sentBytes = sendto(socketHandle,
+                    long int sentBytes = sendto(socketHandle,
                         (const char*) data.data(),
                         data.size(),
                         0,
                         (sockaddr*) &destinationInfo,
                         sizeof(sockaddr_in));
 
-                    if(sentBytes != data.size())
+                    if(sentBytes < 0)
                     {
                         std::cerr << "Failed to send packet to server!" << std::endl;
                     }
                     else
                     {
-                        if(!pInfo.isNotReceivedChecked)
+                        unsigned long int u_sentBytes = sentBytes;
+                        if(u_sentBytes != data.size())
                         {
-                            connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), serverAddress, sequenceID));
-                            checkSentPacketsSize(serverAddress);
+                            std::cerr << "Failed to send packet to server!" << std::endl;
                         }
                         else
                         {
-                            connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), serverAddress, sequenceID, false, true));
-                            checkSentPacketsSize(serverAddress);
+                            if(!pInfo.isNotReceivedChecked)
+                            {
+                                connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(data, std::chrono::steady_clock::now(), serverAddress, sequenceID));
+                                checkSentPacketsSize(serverAddress);
+                            }
+                            else
+                            {
+                                connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), serverAddress, sequenceID, false, true));
+                                checkSentPacketsSize(serverAddress);
+                            }
                         }
                     }
                 }
@@ -456,21 +480,29 @@ void GDT::NetworkConnection::update(float deltaTime)
                     destinationInfo.sin_family = AF_INET;
                     destinationInfo.sin_addr.s_addr = htonl(serverAddress);
                     destinationInfo.sin_port = htons(serverPort);
-                    int sentBytes = sendto(socketHandle,
+                    long int sentBytes = sendto(socketHandle,
                         (const char*) data.data(),
                         data.size(),
                         0,
                         (sockaddr*) &destinationInfo,
                         sizeof(sockaddr_in));
 
-                    if(sentBytes != data.size())
+                    if(sentBytes < 0)
                     {
                         std::cerr << "Failed to send heartbeat packet to server!" << std::endl;
                     }
                     else
                     {
-                        connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), serverAddress, sequenceID, false, true));
-                        checkSentPacketsSize(serverAddress);
+                        unsigned long int u_sentBytes = sentBytes;
+                        if(u_sentBytes != data.size())
+                        {
+                            std::cerr << "Failed to send heartbeat packet to server!" << std::endl;
+                        }
+                        else
+                        {
+                            connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), serverAddress, sequenceID, false, true));
+                            checkSentPacketsSize(serverAddress);
+                        }
                     }
                 }
             }
@@ -1052,7 +1084,8 @@ void GDT::NetworkConnection::preparePacket(std::vector<char>& packetData, uint32
             uint32_t tempValue = htonl(GDT_INTERNAL_NETWORK_PROTOCOL_ID);
             std::memcpy(data, &tempValue, 4);
             tempValue = htonl(id
-                | (isResending ? GDT::Internal::Network::RESENDING : 0));
+                | (isResending ? GDT::Internal::Network::RESENDING :
+                    GDT::Internal::Network::NONE));
             std::memcpy(data + 4, &tempValue, 4);
             tempValue = htonl(sequenceID);
             std::memcpy(data + 8, &tempValue, 4);

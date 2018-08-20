@@ -140,7 +140,7 @@ void GDT::SceneNode::draw(glm::mat4 parentTransform) const
     drawChildren(worldTransform);
 }
 
-void GDT::SceneNode::drawCurrent(glm::mat4 worldTransform) const
+void GDT::SceneNode::drawCurrent(glm::mat4 /*worldTransform*/) const
 {}
 
 void GDT::SceneNode::drawChildren(glm::mat4 worldTransform) const
@@ -149,7 +149,7 @@ void GDT::SceneNode::drawChildren(glm::mat4 worldTransform) const
         [&worldTransform] (const GDT::SceneNode::Ptr& child) { child->draw(worldTransform); });
 }
 
-void GDT::SceneNode::updateCurrent(float deltaTime)
+void GDT::SceneNode::updateCurrent(float /*deltaTime*/)
 {}
 
 void GDT::SceneNode::updateChildren(float deltaTime)

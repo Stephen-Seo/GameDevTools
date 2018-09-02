@@ -321,7 +321,7 @@ void GDT::NetworkConnection::update(float deltaTime)
 
             // packet is valid
 #ifndef NDEBUG
-            std::cout << "Valid packet " << sequence << " received from " << GDT::Internal::Network::addressToString(address) << '\n';
+            std::cout << "Valid packet " << sequence << " received from " << GDT::Internal::Network::addressToString(address) << std::endl;;
 #endif
 
             bool outOfOrder = false;
@@ -566,7 +566,7 @@ void GDT::NetworkConnection::update(float deltaTime)
 
                 // packet is valid
 #ifndef NDEBUG
-                std::cout << "Valid packet " << sequence << " received from " << GDT::Internal::Network::addressToString(serverAddress) << '\n';
+                std::cout << "Valid packet " << sequence << " received from " << GDT::Internal::Network::addressToString(serverAddress) << std::endl;
 #endif
 
                 bool outOfOrder = false;

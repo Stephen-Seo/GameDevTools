@@ -1,3 +1,14 @@
+# Version 1.4
+
+Fix bug where ackBitfield was not properly set in NetworkConnection.cpp, causing
+already received packets to be resent if they were received out of order.
+
+Fix bug where resent packets could be resent again.
+
+Fix version in CMakeLists.txt.
+
+Fix warnings emitted when compiling code.
+
 # Version 1.3
 
 Added feature to NetworkConnection where packets can be specified to not be

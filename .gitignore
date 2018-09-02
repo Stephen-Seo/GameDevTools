@@ -3,3 +3,4 @@ doxygenHTML/
 *.o
 *.swp
 compile_commands.json
+tags

@@ -392,6 +392,13 @@ void GDT::NetworkConnection::update(float deltaTime)
                 return;
             }
 
+#ifndef NDEBUG
+            if(outOfOrder)
+            {
+                std::cout << "Out of order packet\n";
+            }
+#endif
+
             receivedPacket(data.data() + 20, bytes - 20, address, outOfOrder, isResent, isNotReceivedChecked);
         }
     } // if(mode == SERVER)
@@ -629,6 +636,13 @@ void GDT::NetworkConnection::update(float deltaTime)
                     // duplicate packet, ignoring
                     return;
                 }
+
+#ifndef NDEBUG
+                if(outOfOrder)
+                {
+                    std::cout << "Out of order packet\n";
+                }
+#endif
 
                 receivedPacket(data.data() + 20, bytes - 20, serverAddress, outOfOrder, isResent, isNotReceivedChecked);
             }
@@ -938,7 +952,7 @@ void GDT::NetworkConnection::unregisterConnection(uint32_t address)
 
 void GDT::NetworkConnection::shiftBitfield(uint32_t address, uint32_t diff)
 {
-    connectionData.at(address).ackBitfield = (connectionData.at(address).ackBitfield >> diff) | (0x100000000 >> diff);
+    connectionData.at(address).ackBitfield = (connectionData.at(address).ackBitfield >> diff) | 0x80000000;
 }
 
 void GDT::NetworkConnection::checkSentPackets(uint32_t ack, uint32_t bitfield, uint32_t address)

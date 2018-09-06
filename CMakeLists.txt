@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(GameDevTools VERSION 1.4)
+project(GameDevTools VERSION 1.5)
 
 set(GameDevTools_SOURCES
     src/GDT/Internal/NetworkIdentifiers.cpp

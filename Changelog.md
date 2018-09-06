@@ -1,3 +1,12 @@
+# Version 1.5
+
+Change how NetworkConnection does heartbeat packets:
+
+When no packets are queued by a user, the NetworkConnection still sends packets
+at an interval to maintain the connection. This change slows the rate of
+"heartbeat" packets to 150 ms instead of "1/30" seconds for good mode and "1/10"
+seconds for bad mode.
+
 # Version 1.4
 
 Fix bug where ackBitfield was not properly set in NetworkConnection.cpp, causing

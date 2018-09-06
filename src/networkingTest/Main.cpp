@@ -161,7 +161,7 @@ int main(int argc, char** argv)
     auto update = [&connection, &connected, &timer, &time] (float deltaTime) {
         timer += deltaTime;
         connection.update(deltaTime);
-
+/*
         if(timer >= time)
         {
             timer = 0.0f;
@@ -174,6 +174,7 @@ int main(int argc, char** argv)
                 }
             }
         }
+*/
     };
     auto draw = [] () {};
 

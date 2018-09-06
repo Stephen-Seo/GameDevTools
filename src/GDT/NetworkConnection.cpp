@@ -136,7 +136,7 @@ void GDT::NetworkConnection::update(float deltaTime)
         std::list<uint32_t> disconnectQueue;
         for(auto iter = connectionData.begin(); iter != connectionData.end(); ++iter)
         {
-            auto duration = std::chrono::steady_clock::now() - iter->second.elapsedTime;
+            auto duration = std::chrono::steady_clock::now() - iter->second.timeSinceLastReceived;
             if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() >= GDT_INTERNAL_NETWORK_CONNECTION_TIMEOUT_MILLISECONDS)
             {
                 disconnectQueue.push_front(iter->first);
@@ -205,11 +205,17 @@ void GDT::NetworkConnection::update(float deltaTime)
                                 iter->second.sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), iter->first, sequenceID, false, true));
                                 checkSentPacketsSize(iter->first);
                             }
+                            iter->second.timeSinceLastSent = std::chrono::steady_clock::now();
                         }
                     }
                 }
                 else
                 {
+                    auto duration = std::chrono::steady_clock::now() - iter->second.timeSinceLastSent;
+                    if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() < GDT_INTERNAL_NETWORK_HEARTBEAT_SEND_INTERVAL_MILLISECONDS)
+                    {
+                        continue;
+                    }
                     // send a heartbeat(empty) packet because the queue is empty
 
                     std::vector<char> data;
@@ -242,6 +248,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                         {
                             iter->second.sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), iter->first, sequenceID, false, true));
                             checkSentPacketsSize(iter->first);
+                            iter->second.timeSinceLastSent = std::chrono::steady_clock::now();
                         }
                     }
                 }
@@ -328,7 +335,7 @@ void GDT::NetworkConnection::update(float deltaTime)
 
             lookupRtt(address, ack);
 
-            connectionData.at(address).elapsedTime = std::chrono::steady_clock::now();
+            connectionData.at(address).timeSinceLastReceived = std::chrono::steady_clock::now();
             checkSentPackets(ack, ackBitfield, address);
 
             uint32_t diff = 0;
@@ -409,7 +416,7 @@ void GDT::NetworkConnection::update(float deltaTime)
         if(connectionData.size() > 0)
         {
             // check if timed out
-            auto duration = std::chrono::steady_clock::now() - connectionData.at(serverAddress).elapsedTime;
+            auto duration = std::chrono::steady_clock::now() - connectionData.at(serverAddress).timeSinceLastReceived;
             if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() > GDT_INTERNAL_NETWORK_CONNECTION_TIMEOUT_MILLISECONDS)
             {
 #ifndef NDEBUG
@@ -471,11 +478,17 @@ void GDT::NetworkConnection::update(float deltaTime)
                                 connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), serverAddress, sequenceID, false, true));
                                 checkSentPacketsSize(serverAddress);
                             }
+                            connectionData.at(serverAddress).timeSinceLastSent = std::chrono::steady_clock::now();
                         }
                     }
                 }
                 else
                 {
+                    auto duration = std::chrono::steady_clock::now() - connectionData.at(serverAddress).timeSinceLastSent;
+                    if(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() < GDT_INTERNAL_NETWORK_HEARTBEAT_SEND_INTERVAL_MILLISECONDS)
+                    {
+                        goto NETWORK_CLIENT_RECEIVE;
+                    }
                     // send a heartbeat(empty) packet because the queue is empty
 
                     std::vector<char> data;
@@ -509,11 +522,13 @@ void GDT::NetworkConnection::update(float deltaTime)
                         {
                             connectionData.at(serverAddress).sentPackets.push_front(PacketInfo(std::vector<char>(), std::chrono::steady_clock::now(), serverAddress, sequenceID, false, true));
                             checkSentPacketsSize(serverAddress);
+                            connectionData.at(serverAddress).timeSinceLastSent = std::chrono::steady_clock::now();
                         }
                     }
                 }
             }
 
+NETWORK_CLIENT_RECEIVE:
             // receive
             std::vector<char> data(GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE);
 #if PLATFORM == PLATFORM_WINDOWS
@@ -573,7 +588,7 @@ void GDT::NetworkConnection::update(float deltaTime)
 
                 lookupRtt(serverAddress, ack);
 
-                connectionData.at(serverAddress).elapsedTime = std::chrono::steady_clock::now();
+                connectionData.at(serverAddress).timeSinceLastReceived = std::chrono::steady_clock::now();
                 checkSentPackets(ack, bitfield, serverAddress);
 
                 uint32_t diff = 0;

@@ -37,7 +37,8 @@ hasBeenReSent(false)
 {}
 
 GDT::Internal::Network::ConnectionData::ConnectionData() :
-elapsedTime(std::chrono::steady_clock::now()),
+timeSinceLastReceived(std::chrono::steady_clock::now()),
+timeSinceLastSent(std::chrono::steady_clock::now()),
 rSequence(0),
 ackBitfield(0xFFFFFFFF),
 rtt(std::chrono::milliseconds(1000)),
@@ -51,7 +52,8 @@ toggledTimer(0.0f)
 {}
 
 GDT::Internal::Network::ConnectionData::ConnectionData(uint32_t id, uint32_t lSequence, uint16_t port) :
-elapsedTime(std::chrono::steady_clock::now()),
+timeSinceLastReceived(std::chrono::steady_clock::now()),
+timeSinceLastSent(std::chrono::steady_clock::now()),
 id(id),
 lSequence(lSequence),
 rSequence(0),

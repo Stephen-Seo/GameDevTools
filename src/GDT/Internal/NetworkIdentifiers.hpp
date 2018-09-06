@@ -14,6 +14,7 @@
 #define GDT_INTERNAL_NETWORK_CLIENT_RETRY_TIME_SECONDS 5.0f
 #define GDT_INTERNAL_NETWORK_GOOD_RTT_LIMIT_MILLISECONDS 250
 #define GDT_INTERNAL_NETWORK_RECEIVED_MAX_SIZE 8192
+#define GDT_INTERNAL_NETWORK_HEARTBEAT_SEND_INTERVAL_MILLISECONDS 150
 
 #define GDT_INTERNAL_NETWORK_GOOD_MODE_SEND_INTERVAL 1.0f/30.0f
 #define GDT_INTERNAL_NETWORK_BAD_MODE_SEND_INTERVAL 1.0f/10.0f
@@ -71,7 +72,8 @@ struct ConnectionData
     ConnectionData();
     ConnectionData(uint32_t id, uint32_t lSequence, uint16_t port);
 
-    std::chrono::steady_clock::time_point elapsedTime;
+    std::chrono::steady_clock::time_point timeSinceLastReceived;
+    std::chrono::steady_clock::time_point timeSinceLastSent;
     uint32_t id;
     uint32_t lSequence;
     uint32_t rSequence;

@@ -735,7 +735,8 @@ NETWORK_CLIENT_RECEIVE:
             uint32_t address = ntohl(receivedData.sin_addr.s_addr);
             uint16_t port = ntohs(receivedData.sin_port);
 
-            if(bytes >= 20 && port == serverPort)
+            if(bytes >= 20 && port == serverPort
+                && (clientBroadcast || address == serverAddress))
             {
 #ifndef NDEBUG
                 std::cout << "." << std::flush;

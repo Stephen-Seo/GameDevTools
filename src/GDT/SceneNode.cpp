@@ -1,7 +1,9 @@
-
 #include "SceneNode.hpp"
 
-GDT::SceneNode::SceneNode()
+#include <glm/ext/matrix_transform.hpp>
+
+GDT::SceneNode::SceneNode() :
+transform(glm::identity<glm::mat4>())
 {
     parent = nullptr;
 }

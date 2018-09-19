@@ -2,7 +2,7 @@
 #include "gtest/gtest.h"
 
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+#include <glm/ext/matrix_transform.hpp>
 
 #include <GDT/SceneNode.hpp>
 
@@ -32,7 +32,7 @@ TEST(SceneNode, Transform)
     // root
     SceneNode::Ptr rootPtr = SceneNode::Ptr(new SNListener());
     SNListener* root = static_cast<SNListener*>(rootPtr.get());
-    root->applyTransform(glm::translate(glm::mat4(), glm::vec3(5.0f, 0.0f, 2.0f)));
+    root->applyTransform(glm::translate(glm::identity<glm::mat4>(), glm::vec3(5.0f, 0.0f, 2.0f)));
     root->listener = [] (glm::mat4 worldTransform) {
         auto transformed = worldTransform * glm::vec4(0.0, 0.0, 0.0, 1.0f);
         floatEqual(transformed.x, 5.0f);
@@ -42,12 +42,12 @@ TEST(SceneNode, Transform)
     // child 1
     SceneNode::Ptr c1Ptr = SceneNode::Ptr(new SNListener());
     SNListener* c1 = static_cast<SNListener*>(c1Ptr.get());
-    c1->applyTransform(glm::rotate(glm::mat4(), glm::acos(-1.0f) / 2.0f, glm::vec3(0.0f, 0.0f, 1.0f)));
+    c1->applyTransform(glm::rotate(glm::identity<glm::mat4>(), glm::acos(-1.0f) / 2.0f, glm::vec3(0.0f, 0.0f, 1.0f)));
     // root is now:
     // x = 0.0
     // y = 5.0
     // z = 2.0
-    c1->applyTransform(glm::translate(glm::mat4(), glm::vec3(-10.0f, 5.0f, 0.0f)));
+    c1->applyTransform(glm::translate(glm::identity<glm::mat4>(), glm::vec3(-10.0f, 5.0f, 0.0f)));
     c1->listener = [] (glm::mat4 worldTransform) {
         auto transformed = worldTransform * glm::vec4(0.0, 0.0, 0.0, 1.0f);
         floatEqual(transformed.x, -10.0f);
@@ -59,12 +59,12 @@ TEST(SceneNode, Transform)
     // child 2
     SceneNode::Ptr c2Ptr = SceneNode::Ptr(new SNListener());
     SNListener* c2 = static_cast<SNListener*>(c2Ptr.get());
-    c2->applyTransform(glm::rotate(glm::mat4(), glm::acos(-1.0f) / 2.0f, glm::vec3(0.0f, 0.0f, 1.0f)));
+    c2->applyTransform(glm::rotate(glm::identity<glm::mat4>(), glm::acos(-1.0f) / 2.0f, glm::vec3(0.0f, 0.0f, 1.0f)));
     // c1 is now:
     // x = -10.0
     // y = -10.0
     // z =   2.0
-    c2->applyTransform(glm::translate(glm::mat4(), glm::vec3(10.0f, 10.0f, -2.0f)));
+    c2->applyTransform(glm::translate(glm::identity<glm::mat4>(), glm::vec3(10.0f, 10.0f, -2.0f)));
     c2->listener = [] (glm::mat4 worldTransform) {
         auto transformed = worldTransform * glm::vec4(0.0, 0.0, 0.0, 1.0f);
         floatEqual(transformed.x, 0.0f);

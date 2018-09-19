@@ -1,3 +1,9 @@
+# Version 1.6
+
+Fix SceneNode to properly default initialize matrices to an identity matrix.
+Minor fix to NetworkConnection to check ip address when connecting (not in
+broadcast mode).
+
 # Version 1.5
 
 Change how NetworkConnection does heartbeat packets:

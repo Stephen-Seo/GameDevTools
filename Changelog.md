@@ -1,3 +1,9 @@
+# Version 1.8
+
+Change default interval of gameloop to 1/120 instead of 1/90.
+
+Added some documentation and fixed Doxyfile.
+
 # Version 1.7
 
 Added path-finding generic function. See src/test/TestPathFinding.cpp for

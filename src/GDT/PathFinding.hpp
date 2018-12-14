@@ -11,8 +11,8 @@
 
 namespace GDT
 {
-    /*
-     * Returns an unordered_map that has the shortest path from start to end.
+    /*!
+     * \brief Returns an unordered_map that has the shortest path from start to end.
      *
      * Starting from index "start", the unordered_map's value at key "start" is
      * the next index toward "end". The value associated with key "end" is also

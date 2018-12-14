@@ -17,6 +17,15 @@ namespace GDT
      * Starting from index "start", the unordered_map's value at key "start" is
      * the next index toward "end". The value associated with key "end" is also
      * the index "end".
+     *
+     * Note that the array parameter is a 1-dimensional array but it will be
+     * used as a 2-dimensional array, which is why the "width" parameter is
+     * required. X and y are calculated by the following:
+     *
+     * \code{.cpp}
+     * IndexType x = index % width;
+     * IndexType y = index / width;
+     * \endcode
      */
     template <typename T, typename IndexType,
         typename std::enable_if<std::is_integral<IndexType>::value>::type* = 0>

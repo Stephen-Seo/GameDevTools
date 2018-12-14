@@ -285,7 +285,7 @@ WARN_LOGFILE           =
 
 
 
-INPUT                  = src/GDT
+INPUT                  = src/GDT doc/
 
 
 INPUT_ENCODING         = UTF-8
@@ -353,7 +353,6 @@ EXCLUDE_SYMBOLS        =
 
 
 EXAMPLE_PATH           =
-
 
 EXAMPLE_PATTERNS       = *
 
@@ -526,10 +525,10 @@ GENERATE_ECLIPSEHELP   = NO
 ECLIPSE_DOC_ID         = org.doxygen.Project
 
 
-DISABLE_INDEX          = NO
+DISABLE_INDEX          = YES
 
 
-GENERATE_TREEVIEW      = NO
+GENERATE_TREEVIEW      = YES
 
 
 ENUM_VALUES_PER_LINE   = 4

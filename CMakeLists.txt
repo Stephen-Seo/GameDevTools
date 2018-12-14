@@ -44,6 +44,7 @@ if(GTEST_FOUND)
         src/test/TestGameLoop.cpp
         src/test/TestSceneNode.cpp
         src/test/TestCollisionDetection.cpp
+        src/test/TestPathFinding.cpp
     )
 
     add_executable(UnitTests ${UnitTests_SOURCES})

@@ -1,3 +1,8 @@
+# Version 1.7
+
+Added path-finding generic function. See src/test/TestPathFinding.cpp for
+example usage.
+
 # Version 1.6
 
 Fix SceneNode to properly default initialize matrices to an identity matrix.

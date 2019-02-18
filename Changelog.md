@@ -1,3 +1,8 @@
+# Version 1.9
+
+Fix incorrect diff calc in NetworkConnection when next packet ID overflows the
+32-bit integer.
+
 # Version 1.8
 
 Change default interval of gameloop to 1/120 instead of 1/90.

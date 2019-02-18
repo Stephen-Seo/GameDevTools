@@ -351,7 +351,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                 else
                 {
                     // sequence is older packet id, diff requires recalc
-                    diff = sequence + (0xFFFFFFFF - connectionData.at(address).rSequence) + 1;
+                    diff = 0xFFFFFFFF - sequence + connectionData.at(address).rSequence + 1;
 
                     if((connectionData.at(address).ackBitfield & (0x100000000 >> diff)) != 0x0)
                     {
@@ -372,7 +372,7 @@ void GDT::NetworkConnection::update(float deltaTime)
                 if(diff > 0x7FFFFFFF)
                 {
                     // sequence is more recent, diff requires recalc
-                    diff = sequence + (0xFFFFFFFF - connectionData.at(address).rSequence) + 1;
+                    diff = 0xFFFFFFFF - connectionData.at(address).rSequence + sequence + 1;
 
                     connectionData.at(address).rSequence = sequence;
                     shiftBitfield(address, diff);
